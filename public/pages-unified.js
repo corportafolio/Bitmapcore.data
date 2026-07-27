@@ -129,6 +129,57 @@ function TagGroupsPage(props) {
   );
 }
 
+function TagTablePage(props) {
+  var navigate = props.navigate;
+  var tagName = props.tagName;
+  var _a = React.useState([]);
+  var tagBlocks = _a[0];
+  var setTagBlocks = _a[1];
+  var _b = React.useState(true);
+  var isLoading = _b[0];
+  var setIsLoading = _b[1];
+
+  React.useEffect(function() {
+    if (tagName) {
+      setIsLoading(true);
+      MarketplaceApi.getTagBlocks(tagName).then(function(data) {
+        var items = data.data || data || [];
+        setTagBlocks(Array.isArray(items) ? items : []);
+        setIsLoading(false);
+      }).catch(function() { setIsLoading(false); });
+    }
+  }, [tagName]);
+
+  return React.createElement('div', { className:'flex flex-col h-full' },
+    React.createElement(HeaderBar, { showBackButton:true, title:'Tag: ' + tagName, navigate:navigate }),
+    React.createElement('main', { className:'flex-1 overflow-y-auto p-4 lg:p-6' },
+      React.createElement('div', { className:'max-w-4xl mx-auto space-y-4' },
+        React.createElement('h2', { className:'font-alfaslab text-xl text-white' }, 'Tabla de etiqueta: ' + tagName),
+        isLoading ? React.createElement('div', { className:'text-center py-12 font-acme text-bitmap-muted' }, I18n.t('app.loading')) :
+        tagBlocks.length === 0 ? React.createElement('div', { className:'text-center py-12 font-acme text-bitmap-muted' }, I18n.t('tags.noBlocks')) :
+        React.createElement('div', { className:'space-y-2' },
+          tagBlocks.map(function(block, i) {
+            return React.createElement('button', {
+              key:i,
+              onClick:function() { navigate('/blocks/' + (block.bloque || block.blockNumber || i)); },
+              className:'w-full bg-bitmap-surface border border-bitmap-border rounded-xl p-3 flex items-center gap-3 hover:border-bitmap-orange transition-all'
+            },
+              React.createElement('div', { className:'w-12 h-12 flex-shrink-0 rounded-lg overflow-hidden bg-bitmap-black flex items-center justify-center' },
+                React.createElement(MondrianCanvas, { blockNumber:block.bloque || block.blockNumber || i, transactions:[], size:48 })
+              ),
+              React.createElement('div', { className:'flex-1 text-left' },
+                React.createElement('div', { className:'font-alfaslab text-sm text-white' }, '#' + (block.bloque || block.blockNumber || i)),
+                block.totalTransacciones || block.txCount ? React.createElement('div', { className:'font-acme text-[10px] text-bitmap-muted' }, (block.totalTransacciones || block.txCount) + ' TXs') : null
+              ),
+              block.totalBtc ? React.createElement('div', { className:'font-acme text-xs text-bitmap-orange-light' }, BitmapUtils.formatBtc(block.totalBtc) + ' BTC') : null
+            );
+          })
+        )
+      )
+    )
+  );
+}
+
 function VentasPage(props) {
   var navigate = props.navigate;
   var _a = React.useState([]);

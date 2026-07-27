@@ -32,13 +32,13 @@
       React.createElement(Route, { path:'/tag-tables', element:wrapper(TagTablesPage) }),
       React.createElement(Route, { path:'/tag-tables/:tagName', element:wrapper(TagGroupsPage) }),
       React.createElement(Route, { path:'/sales', element:wrapper(VentasPage) }),
-      React.createElement(Route, { path:'/blocks/:id', element:wrapper(BlockDetailPage) }),
+      React.createElement(Route, { path:'/blocks/:id', element:wrapper(BlockDetailPage, { blockId:p.id }) }),
       React.createElement(Route, { path:'/tags/:tagName', element:wrapper(TagTablePage) }),
       React.createElement(Route, { path:'/wallet', element:wrapper(WalletConnectPage) }),
       React.createElement(Route, { path:'/wallet/dashboard', element:wrapper(WalletDashboardPage) }),
       React.createElement(Route, { path:'/mis-activos', element:wrapper(MisActivosPage) }),
-      React.createElement(Route, { path:'/wallet/transaction/:id', element:wrapper(TransactionPage) }),
-      React.createElement(Route, { path:'/mondrian/:id', element:wrapper(MondrianPreviewPage) }),
+      React.createElement(Route, { path:'/wallet/transaction/:id', element:wrapper(TransactionPage, { txId:p.id }) }),
+      React.createElement(Route, { path:'/mondrian/:id', element:wrapper(MondrianPreviewPage, { blockId:p.id }) }),
       React.createElement(Route, { path:'/search', element:wrapper(BlockSearchPage) })
     );
   }
