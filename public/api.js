@@ -1,6 +1,6 @@
 var ApiClient = {
-  baseUrl: BitmapConstants.SERVER_HOST + ':' + BitmapConstants.LOCAL_PORT,
-  proxyUrl: BitmapConstants.SERVER_HOST + ':' + BitmapConstants.PROXY_PORT,
+  baseUrl: '',
+  proxyUrl: '',
   request: function(method, url, data, useProxy) {
     var base = useProxy ? ApiClient.proxyUrl : ApiClient.baseUrl;
     return fetch(base + url, {
