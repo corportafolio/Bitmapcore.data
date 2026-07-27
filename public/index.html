@@ -118,11 +118,14 @@
   </style>
 </head>
 <body>
-  <div id="root"></div>
-  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-  <script src="https://unpkg.com/react-router-dom@6/dist/umd/react-router-dom.production.min.js"></script>
-  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <div id="root">
+    <div style="display:flex;align-items:center;justify-content:center;height:100vh;color:#666;font-family:sans-serif;background:#080008">
+      <p>Cargando BitmapCore...</p>
+    </div>
+  </div>
+  <script src="vendor/react.production.min.js"></script>
+  <script src="vendor/react-dom.production.min.js"></script>
+  <script src="vendor/react-router-dom.production.min.js"></script>
   <script src="utils.js"></script>
   <script src="utils-advanced.js"></script>
   <script src="api.js"></script>
