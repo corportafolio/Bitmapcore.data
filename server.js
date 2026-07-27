@@ -83,9 +83,9 @@ app.get('/api/v1/blocks/search', (req, res) => {
     const num = parseInt(q);
     let items;
     if (!isNaN(num) && tableExists('blocks')) {
-      items = db.prepare('SELECT * FROM blocks WHERE blockNumber = ? OR bloque = ? OR bitmapNumber = ?').all(num, num, num);
+      items = db.prepare('SELECT * FROM blocks WHERE bloque = ?').all(num);
     } else if (tableExists('blocks')) {
-      items = db.prepare('SELECT * FROM blocks WHERE CAST(blockNumber AS TEXT) LIKE ? OR CAST(bloque AS TEXT) LIKE ? OR CAST(bitmapNumber AS TEXT) LIKE ?').all('%' + q + '%', '%' + q + '%', '%' + q + '%');
+      items = db.prepare('SELECT * FROM blocks WHERE CAST(bloque AS TEXT) LIKE ?').all('%' + q + '%');
     } else if (tableExists('tag_tables')) {
       items = db.prepare('SELECT * FROM tag_tables WHERE tagName LIKE ?').all('%' + q + '%');
     } else {
@@ -105,7 +105,7 @@ app.get('/api/v1/blocks/:id', (req, res) => {
     let block = null;
 
     if (tableExists('blocks')) {
-      block = db.prepare('SELECT * FROM blocks WHERE blockNumber = ? OR bloque = ? OR bitmapNumber = ?').get(num, num, num);
+      block = db.prepare('SELECT * FROM blocks WHERE bloque = ?').get(num);
       if (!block) block = db.prepare('SELECT * FROM blocks WHERE rowid = ?').get(num);
     }
 
@@ -115,11 +115,13 @@ app.get('/api/v1/blocks/:id', (req, res) => {
 
     if (!block) return sendError(res, 'Block not found', 404);
 
-    let transactions = [];
-    if (tableExists('block_specific_transactions')) {
-      transactions = db.prepare('SELECT * FROM block_specific_transactions WHERE blockNumber = ? ORDER BY transactionIndex ASC').all(num);
+    if (block && block.bloque !== undefined) {
+      block.blockNumber = block.bloque;
+      block.txCount = block.totalTransacciones;
+      block.txCount = block.totalTransacciones;
+      block.size = block.totalBtc;
+      block.date = block.etiquetas;
     }
-    block.transactions = transactions;
 
     sendSuccess(res, block);
   } catch (err) {
