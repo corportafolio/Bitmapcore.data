@@ -1,16 +1,24 @@
 function MondrianCanvas(props) {
   var blockNumber = props.blockNumber || 0;
-  var transactions = props.transactions || [];
   var size = props.size || 320;
   var onClick = props.onClick;
+
+  var options = {
+    totalTransactions: props.totalTransactions || props.txCount || 0,
+    hash: props.hash || '',
+    isPerfect: props.isPerfect || false,
+    isPunk: props.isPunk || false,
+    etiquetas: props.etiquetas || '',
+    transactions: props.transactions || []
+  };
 
   var canvasRef = React.useRef(null);
 
   React.useEffect(function() {
     if (canvasRef.current) {
-      MondrianGenerator.generate(canvasRef.current, blockNumber, transactions, size);
+      MondrianGenerator.generate(canvasRef.current, blockNumber, options, size);
     }
-  }, [blockNumber, transactions, size]);
+  }, [blockNumber, options.totalTransactions, options.hash, size]);
 
   return React.createElement('canvas', {
     ref: canvasRef,
@@ -27,11 +35,28 @@ function BlockThumbnail(props) {
   var size = props.size || 150;
   var onClick = props.onClick;
 
+  var options = {
+    totalTransactions: props.totalTransactions || 0,
+    hash: props.hash || '',
+    isPerfect: props.isPerfect || false,
+    isPunk: props.isPunk || false,
+    etiquetas: props.etiquetas || ''
+  };
+
   return React.createElement('div', {
     onClick: onClick,
     className: onClick ? 'cursor-pointer w-full h-full' : 'w-full h-full'
   },
-    React.createElement(MondrianCanvas, { blockNumber:blockNumber, transactions:[], size:size })
+    React.createElement(MondrianCanvas, {
+      blockNumber: blockNumber,
+      totalTransactions: options.totalTransactions,
+      hash: options.hash,
+      isPerfect: options.isPerfect,
+      isPunk: options.isPunk,
+      etiquetas: options.etiquetas,
+      transactions: [],
+      size: size
+    })
   );
 }
 

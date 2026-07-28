@@ -1,4 +1,4 @@
-function BlockDetailPage(props) {
+function PantallaDeBloqueEspecifico(props) {
   var navigate = props.navigate;
   var blockId = props.blockId;
   var _a = React.useState(null);
@@ -7,14 +7,23 @@ function BlockDetailPage(props) {
   var _b = React.useState(true);
   var isLoading = _b[0];
   var setIsLoading = _b[1];
+  var _c = React.useState(false);
+  var sidebarOpen = _c[0];
+  var setSidebarOpen = _c[1];
 
   React.useEffect(function() {
     if (!blockId) return;
     setIsLoading(true);
-    BlockchainApi.getBlock(blockId).then(function(data) {
-      setCurrentBlock(data.data || data);
+    BlockViewModel.getBlock(blockId).then(function(block) {
+      if (!block) {
+        setIsLoading(false);
+        return;
+      }
+      setCurrentBlock(block);
       setIsLoading(false);
-    }).catch(function() { setIsLoading(false); });
+    }).catch(function() {
+      setIsLoading(false);
+    });
   }, [blockId]);
 
   if (isLoading) {
@@ -24,35 +33,65 @@ function BlockDetailPage(props) {
     );
   }
 
+  if (!currentBlock) {
+    return React.createElement('div', { className:'flex flex-col h-full' },
+      React.createElement(HeaderBar, { showBackButton:true, title:'Block #' + blockId, navigate:navigate }),
+      React.createElement('main', { className:'flex-1 flex items-center justify-center font-acme text-bitmap-muted' }, 'Bloque no encontrado')
+    );
+  }
+
+  var bloque = currentBlock.bloque !== undefined ? currentBlock.bloque : blockId;
+  var totalBtc = currentBlock.totalBtc || 'N/A';
+  var totalTransacciones = currentBlock.totalTransacciones || 'N/A';
+  var etiquetas = currentBlock.etiquetas || '';
+  var hash = currentBlock.hash || '';
+  var mempool = currentBlock.mempool || '';
+
   return React.createElement('div', { className:'flex flex-col h-full' },
-    React.createElement(HeaderBar, { showBackButton:true, title:'Block #' + blockId, navigate:navigate }),
-    React.createElement('main', { className:'flex-1 overflow-y-auto p-4 lg:p-6' },
-      React.createElement('div', { className:'max-w-2xl mx-auto space-y-6' },
-        React.createElement('div', { className:'flex justify-center' },
-          React.createElement(MondrianCanvas, { blockNumber:Number(blockId), transactions:currentBlock ? (currentBlock.transactions || []) : [], size:320 })
-        ),
-        React.createElement('div', { className:'bg-bitmap-surface border border-bitmap-border rounded-xl p-4 space-y-3' },
-          React.createElement('div', { className:'flex justify-between' },
-            React.createElement('span', { className:'font-alfaslab text-sm text-bitmap-muted' }, I18n.t('block.bitmap')),
-            React.createElement('span', { className:'font-acme text-sm text-white' }, '#' + blockId)
+    React.createElement(HeaderBar, { onMenuToggle: function() { setSidebarOpen(!sidebarOpen); }, navigate:navigate }),
+    React.createElement('div', { className:'flex flex-1 overflow-hidden' },
+      React.createElement(Sidebar, { isOpen:sidebarOpen, onClose: function() { setSidebarOpen(false); }, navigate:navigate, currentPath:'/blocks/' + blockId }),
+      React.createElement('main', { className:'flex-1 overflow-y-auto p-4 lg:p-6' },
+        React.createElement('div', { className:'max-w-2xl mx-auto space-y-4' },
+          React.createElement('div', { className:'flex justify-center' },
+            React.createElement(MondrianCanvas, {
+              blockNumber: Number(bloque),
+              totalTransactions: parseInt(totalTransacciones) || 0,
+              hash: hash,
+              isPerfect: etiquetas.indexOf('Perfect') !== -1,
+              isPunk: etiquetas.indexOf('Punk') !== -1,
+              etiquetas: etiquetas,
+              transactions: [],
+              size: 320
+            })
           ),
-          React.createElement('div', { className:'flex justify-between' },
-            React.createElement('span', { className:'font-alfaslab text-sm text-bitmap-muted' }, I18n.t('block.transactions')),
-            React.createElement('span', { className:'font-acme text-sm text-white' }, (currentBlock && currentBlock.txCount) || 'N/A')
+          React.createElement('div', { className:'grid grid-cols-3 gap-2' },
+            React.createElement('div', { className:'bg-bitmap-surface border border-bitmap-border rounded-lg p-3 text-center' },
+              React.createElement('div', { className:'font-acme text-xs text-bitmap-muted mb-1' }, 'Bloque'),
+              React.createElement('div', { className:'font-alfaslab text-sm text-white' }, '#' + bloque)
+            ),
+            React.createElement('div', { className:'bg-bitmap-surface border border-bitmap-border rounded-lg p-3 text-center' },
+              React.createElement('div', { className:'font-acme text-xs text-bitmap-muted mb-1' }, 'BTC'),
+              React.createElement('div', { className:'font-alfaslab text-sm text-white' }, totalBtc)
+            ),
+            React.createElement('div', { className:'bg-bitmap-surface border border-bitmap-border rounded-lg p-3 text-center' },
+              React.createElement('div', { className:'font-acme text-xs text-bitmap-muted mb-1' }, 'Transacciones'),
+              React.createElement('div', { className:'font-alfaslab text-sm text-white' }, totalTransacciones)
+            )
           ),
-          React.createElement('div', { className:'flex justify-between' },
-            React.createElement('span', { className:'font-alfaslab text-sm text-bitmap-muted' }, I18n.t('block.size')),
-            React.createElement('span', { className:'font-acme text-sm text-white' }, (currentBlock && currentBlock.size) || 'N/A', ' bytes')
-          ),
-          React.createElement('div', { className:'flex justify-between' },
-            React.createElement('span', { className:'font-alfaslab text-sm text-bitmap-muted' }, I18n.t('block.date')),
-            React.createElement('span', { className:'font-acme text-sm text-white' }, (currentBlock && currentBlock.date) || 'N/A')
-          )
-        ),
-        React.createElement('button', {
-          onClick:function() { navigate('/mondrian/' + blockId); },
-          className:'w-full py-3 bg-bitmap-orange text-white font-alfaslab text-sm rounded-lg hover:bg-bitmap-orange/80 transition-colors'
-        }, I18n.t('block.viewMondrian'))
+          hash ? React.createElement('div', { className:'bg-bitmap-surface border border-bitmap-border rounded-lg p-3' },
+            React.createElement('div', { className:'font-acme text-xs text-bitmap-muted mb-1' }, 'Hash'),
+            React.createElement('div', { className:'font-acme text-xs text-bitmap-text break-all' }, hash)
+          ) : null,
+          etiquetas ? React.createElement('div', { className:'bg-bitmap-surface border border-bitmap-border rounded-lg p-3' },
+            React.createElement('div', { className:'font-acme text-xs text-bitmap-muted mb-2' }, 'Etiquetas'),
+            React.createElement(UniversalTagList, { etiquetas:etiquetas, fontSize:11, navigate:navigate })
+          ) : null,
+          React.createElement('button', {
+            onClick:function() { navigate('/mondrian/' + bloque); },
+            className:'w-full py-3 bg-bitmap-orange text-white font-alfaslab text-sm rounded-lg hover:bg-bitmap-orange/80 transition-colors'
+          }, 'Ver Mondrian Completo')
+        )
       )
     )
   );
@@ -128,5 +167,3 @@ function BlockSearchPage(props) {
     )
   );
 }
-
-

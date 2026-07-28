@@ -6,6 +6,19 @@ function HeaderBar(props) {
   var title = props.title;
   var navigate = props.navigate;
   var walletState = StoreApp.get('wallet');
+  var _ac = React.useState(false);
+  var showAccountMenu = _ac[0];
+  var setShowAccountMenu = _ac[1];
+  var _hc = React.useState(false);
+  var showHamburgerMenu = _hc[0];
+  var setShowHamburgerMenu = _hc[1];
+
+  React.useEffect(function() {
+    if (!showAccountMenu && !showHamburgerMenu) return;
+    var close = function() { setShowAccountMenu(false); setShowHamburgerMenu(false); };
+    window.addEventListener('click', close);
+    return function() { window.removeEventListener('click', close); };
+  }, [showAccountMenu, showHamburgerMenu]);
 
   return React.createElement('header', { className:'flex items-center justify-between h-14 bg-bitmap-surface border-b border-bitmap-border px-4 sm:px-6 z-30 relative' },
     showBackButton ? React.createElement('button', {
@@ -16,12 +29,40 @@ function HeaderBar(props) {
       onClick: onMenuToggle,
       className:'font-alfaslab text-white text-xl mr-2 lg:hidden'
     }, '\u2261') : null,
-    !showBackButton ? React.createElement('span', { className:'font-howdybun text-bitmap-orange text-lg tracking-wide' }, 'Bitmapcore') : null,
+    !showBackButton ? React.createElement('div', { className:'flex items-center gap-2 cursor-pointer', onClick: function() { navigate('/'); } },
+      React.createElement('img', { src:'logo_bitmapcore_logo.png', alt:'BitmapCore', className:'h-6 w-6 object-contain' }),
+      React.createElement('span', { className:'font-howdybun text-bitmap-orange text-lg tracking-wide hidden sm:block' }, 'Bitmapcore')
+    ) : null,
     title ? React.createElement('span', { className: showBackButton ? 'font-alfaslab text-white text-lg flex-1 text-center' : 'font-alfaslab text-white text-lg flex-1' }, title) : null,
     !showBackButton ? React.createElement('div', { className:'flex items-center gap-3' },
-      React.createElement('span', { className:'font-acme text-xs text-bitmap-muted hidden sm:block' }, 'BTC/USDT $XX,XXX.XX'),
-      React.createElement('button', { className:'relative text-xl' }, '\uD83D\uDD14',
-        React.createElement('span', { className:'absolute -top-1 -right-1 w-4 h-4 bg-bitmap-red rounded-full text-[10px] text-white flex items-center justify-center font-acme' }, '0')
+      React.createElement('span', { className:'font-acme text-xs text-bitmap-orange hidden sm:block' }, 'BTC/USDT $XX,XXX'),
+      React.createElement('div', { className:'relative' },
+        React.createElement('button', {
+          onClick: function(e) { e.stopPropagation(); setShowAccountMenu(!showAccountMenu); },
+          className:'font-acme text-xs text-bitmap-text hover:text-white transition-colors flex items-center gap-1'
+        }, '\uD83D\uDC64 Cuenta'),
+        showAccountMenu ? React.createElement('div', {
+          className:'absolute right-0 top-full mt-1 w-48 bg-bitmap-surface border border-bitmap-border rounded-lg shadow-lg z-50 py-1',
+          onClick: function(e) { e.stopPropagation(); }
+        },
+          React.createElement('button', { onClick: function() { navigate('/wallet'); setShowAccountMenu(false); }, className:'w-full px-4 py-2 text-left font-acme text-sm text-bitmap-text hover:bg-bitmap-black/30 hover:text-white transition-colors' }, 'Cuentas'),
+          React.createElement('button', { onClick: function() { navigate('/settings'); setShowAccountMenu(false); }, className:'w-full px-4 py-2 text-left font-acme text-sm text-bitmap-text hover:bg-bitmap-black/30 hover:text-white transition-colors' }, 'Perfil'),
+          React.createElement('a', { href:'https://x.com/BitmapCorp', target:'_blank', rel:'noopener noreferrer', className:'w-full px-4 py-2 text-left font-acme text-sm text-bitmap-text hover:bg-bitmap-black/30 hover:text-white transition-colors block' }, '@BitmapCorp')
+        ) : null
+      ),
+      React.createElement('div', { className:'relative' },
+        React.createElement('button', {
+          onClick: function(e) { e.stopPropagation(); setShowHamburgerMenu(!showHamburgerMenu); },
+          className:'font-alfaslab text-white text-xl'
+        }, '\u2261'),
+        showHamburgerMenu ? React.createElement('div', {
+          className:'absolute right-0 top-full mt-1 w-56 bg-bitmap-surface border border-bitmap-border rounded-lg shadow-lg z-50 py-1',
+          onClick: function(e) { e.stopPropagation(); }
+        },
+          React.createElement('a', { href:'https://bitmapcore.net/whitepaper', target:'_blank', className:'w-full px-4 py-2 text-left font-acme text-sm text-bitmap-text hover:bg-bitmap-black/30 hover:text-white transition-colors block' }, 'Whitepaper'),
+          React.createElement('button', { onClick: function() { navigate('/tag-tables'); setShowHamburgerMenu(false); }, className:'w-full px-4 py-2 text-left font-acme text-sm text-bitmap-text hover:bg-bitmap-black/30 hover:text-white transition-colors' }, 'Actualizar Tablas'),
+          React.createElement('button', { onClick: function() { navigate('/wallet'); setShowHamburgerMenu(false); }, className:'w-full px-4 py-2 text-left font-acme text-sm text-bitmap-text hover:bg-bitmap-black/30 hover:text-white transition-colors' }, 'Historial Wallets')
+        ) : null
       )
     ) : null,
     showBackButton && !title ? React.createElement('div', { className:'flex-1' }) : null,
@@ -38,12 +79,11 @@ function Sidebar(props) {
   var navigate = props.navigate;
   var currentPath = props.currentPath;
 
-  var marketplaces = [
+  var items = [
     { id:'ordinalswallet', label:'Ordinalswallet', icon:'\uD83D\uDFE7', path:'/ordinalswallet' },
     { id:'unisat', label:'Unisat', icon:'\uD83D\uDFE1', path:'/unisat' },
     { id:'local', label:'BitmapCore', icon:'\uD83D\uDFE0', path:'/local' },
     { id:'discounts', label:'Descuentos', icon:'\uD83D\uDFE2', path:'/discounts' },
-    { id:'unified', label:'Unified', icon:'\uD83D\uDD35', path:'/unified' },
     { id:'tags', label:'Etiquetas', icon:'\uD83C\uDFF7\uFE0F', path:'/tag-tables' },
     { id:'sales', label:'Ventas', icon:'\uD83D\uDCB0', path:'/sales' }
   ];
@@ -57,15 +97,15 @@ function Sidebar(props) {
     className: 'fixed top-14 left-0 bottom-0 w-60 bg-bitmap-surface border-r border-bitmap-border z-50 transform transition-transform duration-200 ' + (isOpen ? 'translate-x-0' : '-translate-x-full') + ' lg:translate-x-0 lg:relative lg:top-0 lg:z-0 overflow-y-auto'
   },
     React.createElement('nav', { className:'py-2' },
-      marketplaces.map(function(mp) {
-        var isActive = currentPath === mp.path;
+      items.map(function(item) {
+        var isActive = currentPath === item.path;
         return React.createElement('button', {
-          key: mp.id,
-          onClick: function() { navigate(mp.path); onClose(); },
+          key: item.id,
+          onClick: function() { navigate(item.path); onClose(); },
           className: 'flex items-center gap-3 w-full px-4 py-3 text-left transition-all ' + (isActive ? 'border-l-4 border-bitmap-orange bg-bitmap-black/30' : 'border-l-4 border-transparent hover:bg-bitmap-black/20')
         },
-          React.createElement('span', { className:'text-lg' }, mp.icon),
-          React.createElement('span', { className:'font-alfaslab text-sm ' + (isActive ? 'text-bitmap-orange' : 'text-bitmap-text') }, mp.label)
+          React.createElement('span', { className:'text-lg' }, item.icon),
+          React.createElement('span', { className:'font-alfaslab text-sm ' + (isActive ? 'text-bitmap-orange' : 'text-bitmap-text') }, item.label)
         );
       })
     )
@@ -135,7 +175,7 @@ function ErrorBoundary(props) {
   if (hasError) {
     return React.createElement('div', { className:'flex flex-col items-center justify-center w-full h-full bg-bitmap-black p-8' },
       React.createElement('h1', { className:'font-alfaslab text-2xl text-bitmap-orange mb-4' }, 'Error'),
-      React.createElement('p', { className:'font-acme text-bitmap-text mb-6' }, 'Algo salió mal'),
+      React.createElement('p', { className:'font-acme text-bitmap-text mb-6' }, 'Algo sali\u00F3 mal'),
       React.createElement('button', { onClick:function() { setHasError(false); }, className:'px-4 py-2 bg-bitmap-orange text-white rounded-lg font-alfaslab' }, I18n.t('app.retry'))
     );
   }

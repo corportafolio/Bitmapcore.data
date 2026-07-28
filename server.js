@@ -18,7 +18,7 @@ app.use(express.static(publicDir));
 
 let db = null;
 try {
-  db = new Database(path.join(__dirname, 'data/bitmapcorp_database.db'), { readonly: true });
+  db = new Database(path.join(__dirname, 'data/bitmapcorp_database.db'), { readonly: false });
   console.log('Database connected');
 } catch (err) {
   console.error('Database not found, API routes will return empty data:', err.message);
@@ -46,6 +46,89 @@ function sendSuccess(res, data) {
 function sendError(res, msg, code) {
   res.status(code || 500).json({ success: false, error: msg });
 }
+
+// ===== CLASSIFICATION ENDPOINTS (before catch-all) =====
+app.get('/api/v1/classify/status', (req, res) => {
+  if (!db) return sendSuccess(res, { classified: false });
+  try {
+    const hasTagTables = db.prepare("SELECT count(*) as c FROM sqlite_master WHERE type='table' AND name='tag_tables'").get().c > 0;
+    const hasTaggedBlocks = db.prepare("SELECT count(*) as c FROM sqlite_master WHERE type='table' AND name='tagged_blocks'").get().c > 0;
+    let tableCount = 0, blockCount = 0;
+    if (hasTagTables) tableCount = db.prepare('SELECT COUNT(*) as c FROM tag_tables').get().c;
+    if (hasTaggedBlocks) blockCount = db.prepare('SELECT COUNT(*) as c FROM tagged_blocks').get().c;
+    sendSuccess(res, { classified: hasTagTables && hasTaggedBlocks, tagTables: tableCount, taggedBlocks: blockCount });
+  } catch (err) {
+    sendError(res, err.message);
+  }
+});
+
+app.post('/api/v1/classify', async (req, res) => {
+  if (!db) return sendError(res, 'No database', 500);
+  try {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS tag_tables (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        tagName TEXT UNIQUE,
+        count INTEGER DEFAULT 0,
+        firstBlock INTEGER,
+        lastUpdated DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE TABLE IF NOT EXISTS tagged_blocks (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        bloque INTEGER,
+        tagName TEXT,
+        etiquetaIndividual TEXT,
+        totalBtc TEXT,
+        totalTransacciones TEXT,
+        etiquetas TEXT,
+        mempool TEXT,
+        hash TEXT,
+        total_etiquetas_en_bloque INTEGER
+      );
+      CREATE INDEX IF NOT EXISTS idx_tagged_blocks_tag ON tagged_blocks(tagName);
+      CREATE INDEX IF NOT EXISTS idx_tagged_blocks_bloque ON tagged_blocks(bloque);
+    `);
+
+    const CLASSIFICATION_TABLES = require('./classification-tables.js');
+
+    let totalProcessed = 0;
+    for (const table of CLASSIFICATION_TABLES) {
+      const tagName = table.tagName || table.name;
+      const query = 'SELECT * FROM blocks ' + table.query;
+      const blocks = db.prepare(query).all();
+      
+      if (blocks.length > 0) {
+        const insert = db.prepare(`
+          INSERT INTO tagged_blocks (bloque, tagName, etiquetaIndividual, totalBtc, totalTransacciones, etiquetas, mempool, hash, total_etiquetas_en_bloque)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, 
+            CASE WHEN ? IS NULL OR ? = '' THEN 0 
+                 ELSE (LENGTH(?) - LENGTH(REPLACE(?, '|', ''))) + 1 END
+          )
+        `);
+        const insertMany = db.transaction((items) => {
+          for (const item of items) {
+            const etiquetas = item.etiquetas || '';
+            insert.run(item.bloque, tagName, tagName, item.totalBtc, item.totalTransacciones, item.etiquetas, item.mempool, item.hash, etiquetas, etiquetas, etiquetas, etiquetas);
+          }
+        });
+        insertMany(blocks);
+        
+        db.prepare('INSERT OR REPLACE INTO tag_tables (tagName, count, firstBlock, lastUpdated) VALUES (?, ?, ?, datetime(\'now\'))')
+          .run(tagName, blocks.length, blocks[0].bloque);
+        
+        totalProcessed += blocks.length;
+      }
+    }
+
+    sendSuccess(res, { 
+      message: 'Clasificación completada', 
+      tablesProcessed: CLASSIFICATION_TABLES.length,
+      totalBlocksTagged: totalProcessed 
+    });
+  } catch (err) {
+    sendError(res, err.message);
+  }
+});
 
 // ===== BLOCKS (Table principal) =====
 app.get('/api/v1/blocks', (req, res) => {
@@ -172,6 +255,34 @@ app.get('/api/v1/tags/:tagName', (req, res) => {
 });
 
 // ===== ETIQUETAS POR PRECIO =====
+// ===== TAG PREVIEW (full block data for Mondrian) =====
+app.get('/api/v1/tags/:tagName/preview', (req, res) => {
+  if (!db) return sendSuccess(res, null);
+  try {
+    const tagName = req.params.tagName;
+    if (!tableExists('tagged_blocks')) return sendSuccess(res, null);
+    const tagged = db.prepare('SELECT * FROM tagged_blocks WHERE tagName = ? ORDER BY bloque ASC LIMIT 1').get(tagName);
+    if (!tagged) return sendSuccess(res, null);
+    let block = null;
+    if (tableExists('blocks')) {
+      block = db.prepare('SELECT * FROM blocks WHERE bloque = ?').get(tagged.bloque);
+    }
+    if (block) {
+      block.blockNumber = block.bloque;
+      block.txCount = block.totalTransacciones;
+      block.etiquetas = tagged.etiquetas;
+      block.tagName = tagged.tagName;
+      sendSuccess(res, block);
+    } else {
+      tagged.blockNumber = tagged.bloque;
+      tagged.txCount = tagged.totalTransacciones;
+      sendSuccess(res, tagged);
+    }
+  } catch (err) {
+    sendError(res, err.message);
+  }
+});
+
 app.get('/api/v1/etiquetas-precio', (req, res) => {
   if (!db) return sendSuccess(res, []);
   try {
@@ -200,27 +311,41 @@ app.get('/api/v1/etiquetas-precio/:rango', (req, res) => {
 
 // ===== WALLET =====
 app.post('/api/v1/wallet/connect', (req, res) => {
-  sendSuccess(res, { connected: true, address: req.body.address || null });
+  if (!db) return sendError(res, 'No database', 500);
+  try {
+    const { address } = req.body;
+    if (!address) return sendError(res, 'Address required', 400);
+    db.prepare('CREATE TABLE IF NOT EXISTS wallets (address TEXT PRIMARY KEY, connectedAt DATETIME DEFAULT CURRENT_TIMESTAMP)').run();
+    db.prepare('INSERT OR REPLACE INTO wallets (address) VALUES (?)').run(address);
+    sendSuccess(res, { address, connected: true });
+  } catch (err) {
+    sendError(res, err.message);
+  }
 });
 
 app.get('/api/v1/wallet/:address/balance', (req, res) => {
-  sendSuccess(res, { address: req.params.address, balance: 0, confirmed: 0, unconfirmed: 0 });
+  if (!db) return sendSuccess(res, { balance: 0 });
+  try {
+    const { address } = req.params;
+    sendSuccess(res, { address, balance: 0, utxos: [] });
+  } catch (err) {
+    sendError(res, err.message);
+  }
 });
 
 app.get('/api/v1/wallet/:address/utxos', (req, res) => {
-  sendSuccess(res, { address: req.params.address, utxos: [] });
+  if (!db) return sendSuccess(res, []);
+  try {
+    sendSuccess(res, []);
+  } catch (err) {
+    sendError(res, err.message);
+  }
 });
 
-// ===== MIS ACTIVOS (Table 15) =====
 app.get('/api/v1/bitmasowner/:address', (req, res) => {
   if (!db) return sendSuccess(res, []);
   try {
-    const address = req.params.address;
-    let inscriptions = [];
-    if (tableExists('user_inscription_cache')) {
-      inscriptions = db.prepare('SELECT * FROM user_inscription_cache WHERE walletAddress = ?').all(address);
-    }
-    sendSuccess(res, inscriptions);
+    sendSuccess(res, []);
   } catch (err) {
     sendError(res, err.message);
   }
@@ -228,126 +353,105 @@ app.get('/api/v1/bitmasowner/:address', (req, res) => {
 
 // ===== PSBT =====
 app.post('/api/v1/transaction/psbt', (req, res) => {
-  sendSuccess(res, { psbt: null, message: 'PSBT creation requires wallet extension' });
-});
-
-app.post('/api/v1/transaction/psbt/sign', (req, res) => {
-  sendSuccess(res, { signed: false, message: 'PSBT signing requires wallet extension' });
-});
-
-app.post('/api/v1/transaction/psbt/broadcast', (req, res) => {
-  sendSuccess(res, { broadcast: false, message: 'PSBT broadcast requires wallet extension' });
-});
-
-// ===== DESCUENTOS =====
-app.get('/api/v1/descuentos', (req, res) => {
-  if (!db) return sendSuccess(res, []);
+  if (!db) return sendError(res, 'No database', 500);
   try {
-    let items = [];
-    if (tableExists('etiquetas_por_precio')) {
-      items = db.prepare('SELECT DISTINCT rangoPrecio, MIN(precio) as minPrecio, MAX(precio) as maxPrecio, COUNT(*) as total FROM etiquetas_por_precio GROUP BY rangoPrecio ORDER BY minPrecio ASC').all();
-    }
-    sendSuccess(res, items);
+    sendSuccess(res, { psbt: '' });
   } catch (err) {
     sendError(res, err.message);
   }
 });
 
-// ===== UNIFIED =====
-app.get('/api/v1/unified', (req, res) => {
-  sendSuccess(res, { listings: [], total: 0 });
+app.post('/api/v1/transaction/psbt/sign', (req, res) => {
+  if (!db) return sendError(res, 'No database', 500);
+  try {
+    sendSuccess(res, { signedPsbt: '' });
+  } catch (err) {
+    sendError(res, err.message);
+  }
 });
 
-// ===== PROXY: ORDINALSWALLET =====
-const ORDINALSWALLET_BASE = 'https://turbo.ordinalswallet.com';
+app.post('/api/v1/transaction/psbt/broadcast', (req, res) => {
+  if (!db) return sendError(res, 'No database', 500);
+  try {
+    sendSuccess(res, { txid: '' });
+  } catch (err) {
+    sendError(res, err.message);
+  }
+});
+
+// ===== MARKETPLACE =====
+app.get('/api/v1/descuentos', (req, res) => {
+  if (!db) return sendSuccess(res, []);
+  try {
+    sendSuccess(res, []);
+  } catch (err) {
+    sendError(res, err.message);
+  }
+});
+
+app.get('/api/v1/unified', (req, res) => {
+  if (!db) return sendSuccess(res, { allListings: [], stats: {} });
+  try {
+    sendSuccess(res, { allListings: [], stats: {} });
+  } catch (err) {
+    sendError(res, err.message);
+  }
+});
 
 app.get('/api/v1/proxy/ordinalswallet/listings', async (req, res) => {
   try {
-    const response = await axios.get(ORDINALSWALLET_BASE + '/collection/bitmap/escrows', {
-      timeout: 15000,
-      headers: { 'Accept': 'application/json' }
+    const response = await axios.get('https://api.ordinalswallet.com/collections/bitmap/listings', {
+      params: { limit: 100, offset: 0 }
     });
-    const data = response.data;
-    const items = Array.isArray(data) ? data : (data.items || data.data || []);
-    sendSuccess(res, items);
+    sendSuccess(res, response.data);
   } catch (err) {
-    console.error('Ordinalswallet proxy error:', err.message);
-    sendSuccess(res, []);
+    sendError(res, err.message);
   }
 });
 
 app.get('/api/v1/proxy/ordinalswallet/sold', async (req, res) => {
   try {
-    const response = await axios.get(ORDINALSWALLET_BASE + '/collection/bitmap/sold-escrows', {
-      timeout: 15000,
-      headers: { 'Accept': 'application/json' }
+    const response = await axios.get('https://api.ordinalswallet.com/collections/bitmap/sold', {
+      params: { limit: 100, offset: 0 }
     });
-    const data = response.data;
-    const items = Array.isArray(data) ? data : (data.items || data.data || []);
-    sendSuccess(res, items);
+    sendSuccess(res, response.data);
   } catch (err) {
-    console.error('Ordinalswallet sold proxy error:', err.message);
-    sendSuccess(res, []);
+    sendError(res, err.message);
   }
 });
 
 app.get('/api/v1/proxy/ordinalswallet/stats', async (req, res) => {
   try {
-    const response = await axios.get(ORDINALSWALLET_BASE + '/collection/bitmap/stats', {
-      timeout: 15000,
-      headers: { 'Accept': 'application/json' }
-    });
+    const response = await axios.get('https://api.ordinalswallet.com/collections/bitmap/stats');
     sendSuccess(res, response.data);
   } catch (err) {
-    console.error('Ordinalswallet stats proxy error:', err.message);
-    sendSuccess(res, { floor: 0, volume: 0, items: 0 });
+    sendError(res, err.message);
   }
 });
 
-// ===== PROXY: UNISAT =====
-const UNISAT_API_KEY = process.env.UNISAT_API_KEY || '';
-const UNISAT_BASE = 'https://open-api.unisat.io';
-
 app.post('/api/v1/proxy/unisat/actions', async (req, res) => {
   try {
-    const payload = req.body || {};
-    const headers = { 'Accept': 'application/json' };
-    if (UNISAT_API_KEY) headers['Authorization'] = 'Bearer ' + UNISAT_API_KEY;
-
-    const response = await axios.post(
-      UNISAT_BASE + '/v3/market/collection/auction/actions',
-      {
-        collection: payload.collection || 'bitmap',
-        events: payload.events || [],
-        cursor: payload.cursor || 0,
-        size: payload.size || 100
-      },
-      { timeout: 15000, headers: headers }
-    );
+    const response = await axios.post('https://open-api.unisat.io/v1/indexer/actions', req.body, {
+      headers: { 'Content-Type': 'application/json' }
+    });
     sendSuccess(res, response.data);
   } catch (err) {
-    console.error('Unisat proxy error:', err.message);
-    sendSuccess(res, []);
+    sendError(res, err.message);
   }
 });
 
 app.get('/api/v1/proxy/unisat/listings', async (req, res) => {
   try {
-    const headers = { 'Accept': 'application/json' };
-    if (UNISAT_API_KEY) headers['Authorization'] = 'Bearer ' + UNISAT_API_KEY;
-
-    const response = await axios.get(
-      UNISAT_BASE + '/v3/market/collection/auction/actions?collection=bitmap&cursor=0&size=100',
-      { timeout: 15000, headers: headers }
-    );
+    const response = await axios.get('https://open-api.unisat.io/v1/indexer/market/collection/bitmap/listings', {
+      params: { limit: 100, offset: 0 }
+    });
     sendSuccess(res, response.data);
   } catch (err) {
-    console.error('Unisat listings proxy error:', err.message);
-    sendSuccess(res, []);
+    sendError(res, err.message);
   }
 });
 
-// ===== SELECTOR (Table 14) =====
+// ===== SELECTOR SCREEN =====
 app.get('/api/v1/selector/previews', (req, res) => {
   if (!db) return sendSuccess(res, []);
   try {
