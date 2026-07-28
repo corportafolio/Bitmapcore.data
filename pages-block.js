@@ -1,4 +1,4 @@
-function BlockDetailPage(props) {
+function PantallaDeBloqueEspecifico(props) {
   var navigate = props.navigate;
   var blockId = props.blockId;
   var _a = React.useState(null);
@@ -14,20 +14,21 @@ function BlockDetailPage(props) {
   React.useEffect(function() {
     if (!blockId) return;
     setIsLoading(true);
-    BlockchainApi.getBlock(blockId).then(function(data) {
-      var block = data.data || data;
-      if (block && !block.etiquetas && block.bloque !== undefined) {
-        setCurrentBlock(block);
-      } else {
-        setCurrentBlock(block);
+    BlockViewModel.getBlock(blockId).then(function(block) {
+      if (!block) {
+        setIsLoading(false);
+        return;
       }
+      setCurrentBlock(block);
       setIsLoading(false);
-    }).catch(function() { setIsLoading(false); });
+    }).catch(function() {
+      setIsLoading(false);
+    });
   }, [blockId]);
 
   if (isLoading) {
     return React.createElement('div', { className:'flex flex-col h-full' },
-      React.createElement(HeaderBar, { showBackButton:true, title:'Block', navigate:navigate }),
+      React.createElement(HeaderBar, { showBackButton:true, title:'Bloque', navigate:navigate }),
       React.createElement('main', { className:'flex-1 flex items-center justify-center font-acme text-bitmap-muted' }, I18n.t('app.loading'))
     );
   }

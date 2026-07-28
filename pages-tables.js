@@ -1,14 +1,11 @@
-// PantallaDeTablas: /tag-tables - 55 previews (nombre + 1 Mondrian preview)
-// TagTableScreen: /tag-tables/:tagName - lista completa de bloques de una etiqueta
-
-function TagTablesPage(props) {
+function PantallaDeTablas(props) {
   var navigate = props.navigate;
   var _a = React.useState(false);
   var sidebarOpen = _a[0];
   var setSidebarOpen = _a[1];
   var _b = React.useState([]);
-  var tagsWithPreviews = _b[0];
-  var setTagsWithPreviews = _b[1];
+  var tags = _b[0];
+  var setTags = _b[1];
   var _c = React.useState(true);
   var isLoading = _c[0];
   var setIsLoading = _c[1];
@@ -23,14 +20,14 @@ function TagTablesPage(props) {
   function loadAllTags() {
     setIsLoading(true);
     TagViewModel.loadTagsWithPreviews().then(function(data) {
-      setTagsWithPreviews(data);
+      setTags(data);
       setIsLoading(false);
     }).catch(function() {
       setIsLoading(false);
     });
   }
 
-  var filteredTags = tagsWithPreviews.filter(function(t) {
+  var filteredTags = tags.filter(function(t) {
     return t.name.toLowerCase().indexOf(searchQuery.toLowerCase()) !== -1;
   });
 
@@ -191,7 +188,7 @@ function TagTableScreen(props) {
             React.createElement('h2', { className:'font-alfaslab text-lg text-white' }, decodedName),
             React.createElement('span', { className:'font-acme text-sm text-bitmap-muted' }, totalCount + ' bloques')
           ),
-          React.createElement('div', { className:'mt-2: 'flex flex-wrap gap-2 mt-2' },
+          React.createElement('div', { className:'flex flex-wrap gap-2 mt-2' },
             React.createElement(UniversalTagList, { etiquetas: decodedName, fontSize: 11, navigate: navigate })
           )
         ),
