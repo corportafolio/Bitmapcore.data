@@ -72,28 +72,39 @@ function PantallaDeTablas(props) {
 function TagPreviewCard(props) {
   var tag = props.tag;
   var onClick = props.onClick;
+  var preview = tag.preview;
+  var blockNum = preview ? (preview.blockNumber || preview.bloque || 0) : 0;
+  var totalEtiquetas = preview ? (parseInt(preview.totalEtiquetas) || tag.count || 0) : 0;
+  var totalBloquesUnicos = preview ? (parseInt(preview.totalBloquesUnicos) || totalEtiquetas) : 0;
+  var tagName = preview ? preview.tagName : '';
+  var isMultiTagBlock = tagName.indexOf('millonaria') !== -1 || tagName.indexOf('Millonaria') !== -1;
 
   return React.createElement('button', {
     onClick: onClick,
     className:'bg-bitmap-surface border border-bitmap-border rounded-xl p-3 hover:border-bitmap-orange transition-all text-left h-full flex flex-col'
   },
-    tag.preview ? React.createElement('div', { className:'w-full aspect-square mb-2 rounded-lg overflow-hidden bg-bitmap-black relative' },
-      React.createElement(MondrianCanvas, {
-        blockNumber: tag.preview.blockNumber || tag.preview.bloque || 0,
-        totalTransactions: tag.preview.totalTransactions || 0,
-        hash: tag.preview.hash || '',
-        isPerfect: tag.preview.isPerfect || false,
-        isPunk: tag.preview.isPunk || false,
-        etiquetas: tag.preview.etiquetas || '',
-        transactions: [],
-        size: 200
-      }),
-      React.createElement('div', { className:'absolute bottom-1 right-1 bg-bitmap-black/80 text-white text-xs font-acme px-1.5 py-0.5 rounded' }, '#' + (tag.preview.blockNumber || tag.preview.bloque))
-    ) : React.createElement('div', { className:'w-full aspect-square mb-2 rounded-lg bg-bitmap-black flex items-center justify-center' },
-      React.createElement('span', { className:'text-3xl' }, '\uD83D\uDCCB')
+    React.createElement('div', { className:'flex flex-col items-center text-center mb-2' },
+      React.createElement(UniversalTag, { text:tag.name, fontSize:12 }),
+      isMultiTagBlock ? React.createElement('div', { className:'font-acme text-xs text-bitmap-muted mt-1' },
+        totalEtiquetas + ' etiquetas / ' + totalBloquesUnicos + ' bloques'
+      ) : React.createElement('div', { className:'font-acme text-xs text-bitmap-muted mt-1' },
+        totalBloquesUnicos + ' bloques'
+      ),
+      React.createElement('div', { className:'font-acme text-[10px] text-bitmap-muted' }, 'Primer bloque #' + blockNum)
     ),
-    React.createElement('div', { className:'font-alfaslab text-sm text-white truncate' }, tag.name),
-    React.createElement('div', { className:'font-acme text-xs text-bitmap-muted mt-1' }, tag.count + ' bloques')
+    preview ? React.createElement('div', { className:'w-full aspect-square rounded-lg overflow-hidden bg-bitmap-black relative' },
+      React.createElement(MondrianCanvas, {
+        blockNumber: blockNum,
+        totalTransactions: preview.totalTransactions || 0,
+        hash: preview.hash || '',
+        isPerfect: preview.isPerfect || false,
+        isPunk: preview.isPunk || false,
+        etiquetas: preview.etiquetas || '',
+        size: 200
+      })
+    ) : React.createElement('div', { className:'w-full aspect-square rounded-lg bg-bitmap-black flex items-center justify-center' },
+      React.createElement('span', { className:'text-3xl' }, '\uD83D\uDCCB')
+    )
   );
 }
 

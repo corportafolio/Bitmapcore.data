@@ -76,7 +76,7 @@ function Sidebar(props) {
     { id:'unisat', label:'Unisat', icon:'\uD83D\uDFE1', path:'/unisat' },
     { id:'local', label:'BitmapCore', icon:'\uD83D\uDFE0', path:'/local' },
     { id:'discounts', label:'Descuentos', icon:'\uD83D\uDFE2', path:'/discounts' },
-    { id:'tags', label:'Etiquetas', icon:'\uD83C\uDFF7\uFE0F', path:'/tag-tables' },
+    { id:'tags', label:'Etiquetas', icon:'\uD83C\uDFF7\uFE0F', path:'/' },
     { id:'sales', label:'Ventas', icon:'\uD83D\uDCB0', path:'/sales' }
   ];
 

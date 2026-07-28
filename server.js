@@ -256,26 +256,41 @@ app.get('/api/v1/tags/:tagName', (req, res) => {
 
 // ===== ETIQUETAS POR PRECIO =====
 // ===== TAG PREVIEW (full block data for Mondrian) =====
+// ===== TAG PREVIEW (full block data for Mondrian) =====
 app.get('/api/v1/tags/:tagName/preview', (req, res) => {
   if (!db) return sendSuccess(res, null);
   try {
     const tagName = req.params.tagName;
-    if (!tableExists('tagged_blocks')) return sendSuccess(res, null);
+    if (!tableExists('tagged_blocks') || !tableExists('tag_tables')) return sendSuccess(res, null);
+
+    // Get the first tagged block with full data from blocks table
     const tagged = db.prepare('SELECT * FROM tagged_blocks WHERE tagName = ? ORDER BY bloque ASC LIMIT 1').get(tagName);
     if (!tagged) return sendSuccess(res, null);
+
+    // Get total counts for this tag
+    const stats = db.prepare(`
+      SELECT COUNT(*) as totalEtiquetas, COUNT(DISTINCT bloque) as totalBloquesUnicos
+      FROM tagged_blocks WHERE tagName = ?
+    `).get(tagName);
+
     let block = null;
     if (tableExists('blocks')) {
       block = db.prepare('SELECT * FROM blocks WHERE bloque = ?').get(tagged.bloque);
     }
+
     if (block) {
       block.blockNumber = block.bloque;
       block.txCount = block.totalTransacciones;
       block.etiquetas = tagged.etiquetas;
       block.tagName = tagged.tagName;
+      block.totalEtiquetas = stats ? stats.totalEtiquetas : 0;
+      block.totalBloquesUnicos = stats ? stats.totalBloquesUnicos : 0;
       sendSuccess(res, block);
     } else {
       tagged.blockNumber = tagged.bloque;
       tagged.txCount = tagged.totalTransacciones;
+      tagged.totalEtiquetas = stats ? stats.totalEtiquetas : 0;
+      tagged.totalBloquesUnicos = stats ? stats.totalBloquesUnicos : 0;
       sendSuccess(res, tagged);
     }
   } catch (err) {

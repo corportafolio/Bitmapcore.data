@@ -110,6 +110,8 @@ var TagViewModel = {
         block.etiquetas = block.etiquetas || '';
         block.isPerfect = (block.etiquetas || '').indexOf('Perfect') !== -1;
         block.isPunk = (block.etiquetas || '').indexOf('Punk') !== -1;
+        block.totalEtiquetas = block.totalEtiquetas || 0;
+        block.totalBloquesUnicos = block.totalBloquesUnicos || 0;
 
         var newPreviews = Object.assign({}, self._state.tagPreviews);
         newPreviews[tagName] = block;

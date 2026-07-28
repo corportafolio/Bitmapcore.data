@@ -12,8 +12,23 @@ function HomePage(props) {
   var _d = React.useState(false);
   var isSearching = _d[0];
   var setIsSearching = _d[1];
+  var _e = React.useState([]);
+  var tags = _e[0];
+  var setTags = _e[1];
+  var _f = React.useState(true);
+  var tagsLoading = _f[0];
+  var setTagsLoading = _f[1];
 
   var debounceTimer = null;
+
+  React.useEffect(function() {
+    TagViewModel.loadTagsWithPreviews().then(function(data) {
+      setTags(data);
+      setTagsLoading(false);
+    }).catch(function() {
+      setTagsLoading(false);
+    });
+  }, []);
 
   var handleSearch = function(query) {
     setSearchQuery(query);
@@ -43,24 +58,27 @@ function HomePage(props) {
     else navigate('/tags/' + result.id);
   };
 
+  var filteredTags = tags.filter(function(t) {
+    return t.name.toLowerCase().indexOf(searchQuery.toLowerCase()) !== -1 || searchQuery === '';
+  });
+
   return React.createElement('div', { className:'flex flex-col h-full' },
     React.createElement(HeaderBar, { onMenuToggle:function() { setSidebarOpen(!sidebarOpen); }, navigate:navigate }),
     React.createElement('div', { className:'flex flex-1 overflow-hidden' },
       React.createElement(Sidebar, { isOpen:sidebarOpen, onClose:function() { setSidebarOpen(false); }, navigate:navigate, currentPath:'/' }),
       React.createElement('main', { className:'flex-1 overflow-y-auto p-4 lg:p-6' },
-        React.createElement('div', { className:'max-w-4xl mx-auto space-y-6' },
-          React.createElement('div', { className:'bg-bitmap-surface border border-bitmap-border rounded-xl p-6' },
-            React.createElement('div', { className:'flex items-center gap-3 mb-2' },
-              React.createElement('span', { className:'text-2xl' }, '\uD83D\uDD0D'),
-              React.createElement('h2', { className:'font-alfaslab text-lg text-white' }, 'Buscar bloques o etiquetas')
+        React.createElement('div', { className:'max-w-4xl mx-auto space-y-4' },
+          React.createElement('div', { className:'bg-bitmap-surface border border-bitmap-border rounded-xl p-4' },
+            React.createElement('div', { className:'flex items-center gap-2' },
+              React.createElement('span', { className:'text-lg' }, '\uD83D\uDD0D'),
+              React.createElement('input', {
+                type:'text',
+                value:searchQuery,
+                onChange:function(e) { handleSearch(e.target.value); },
+                placeholder:'Buscar bloque o etiqueta...',
+                className:'flex-1 bg-bitmap-black border border-bitmap-border rounded-lg px-3 py-2 font-acme text-sm text-bitmap-text placeholder-bitmap-muted focus:outline-none focus:border-bitmap-orange transition-colors h-10'
+              })
             ),
-            React.createElement('input', {
-              type:'text',
-              value:searchQuery,
-              onChange:function(e) { handleSearch(e.target.value); },
-              placeholder:'Escribe un número de bloque o nombre de etiqueta...',
-              className:'w-full bg-bitmap-black border border-bitmap-border rounded-lg px-4 py-3 font-acme text-bitmap-text placeholder-bitmap-muted focus:outline-none focus:border-bitmap-orange transition-colors'
-            }),
             isSearching ? React.createElement('div', { className:'mt-2 font-acme text-xs text-bitmap-muted' }, I18n.t('app.loading')) : null
           ),
           searchResults.length > 0 ? React.createElement('div', { className:'grid grid-cols-2 md:grid-cols-4 gap-3' },
@@ -76,24 +94,19 @@ function HomePage(props) {
             })
           ) : null,
           searchQuery && searchResults.length === 0 && !isSearching ? React.createElement('div', { className:'text-center py-8 font-acme text-bitmap-muted' }, I18n.t('app.noResults')) : null,
-          !searchQuery ? React.createElement('div', { className:'grid grid-cols-1 md:grid-cols-2 gap-4' },
-            React.createElement('button', {
-              onClick: function() { navigate('/marketplace'); },
-              className:'bg-bitmap-surface border border-bitmap-border rounded-xl p-6 hover:border-bitmap-orange transition-all text-left'
-            },
-              React.createElement('div', { className:'text-2xl mb-2' }, '\uD83C\uDFEA'),
-              React.createElement('h3', { className:'font-alfaslab text-base text-white mb-1' }, 'Marketplaces'),
-              React.createElement('p', { className:'font-acme text-sm text-bitmap-muted' }, 'Accede a los 7 marketplaces')
-            ),
-            React.createElement('button', {
-              onClick: function() { navigate('/search'); },
-              className:'bg-bitmap-surface border border-bitmap-border rounded-xl p-6 hover:border-bitmap-orange transition-all text-left'
-            },
-              React.createElement('div', { className:'text-2xl mb-2' }, '\uD83D\uDCCB'),
-              React.createElement('h3', { className:'font-alfaslab text-base text-white mb-1' }, 'Tablas'),
-              React.createElement('p', { className:'font-acme text-sm text-bitmap-muted' }, 'Explora las tablas de etiquetas')
+          tagsLoading ? React.createElement('div', { className:'flex items-center justify-center h-32 font-acme text-bitmap-muted' }, I18n.t('app.loading')) :
+          React.createElement('div', { className:'space-y-2' },
+            React.createElement('h2', { className:'font-alfaslab text-lg text-white' }, 'Tablas de Etiquetas'),
+            React.createElement('div', { className:'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3' },
+              filteredTags.map(function(tag, i) {
+                return React.createElement(TagPreviewCard, {
+                  key: tag.name + '-' + i,
+                  tag: tag,
+                  onClick: function() { navigate('/tag-tables/' + encodeURIComponent(tag.name)); }
+                });
+              })
             )
-          ) : null
+          )
         )
       )
     )
