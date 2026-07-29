@@ -1,0 +1,695 @@
+const express = require('express');
+const cors = require('cors');
+const path = require('path');
+const Database = require('better-sqlite3');
+const axios = require('axios');
+
+const app = express();
+const PORT = 5500;
+
+app.use(cors({
+  origin: ['https://bitmapcore.net', 'https://www.bitmapcore.net', 'http://localhost:5173', 'http://localhost:3000'],
+  credentials: true
+}));
+app.use(express.json());
+
+const publicDir = path.join(__dirname, 'public');
+app.use(express.static(publicDir));
+
+let db = null;
+try {
+  db = new Database(path.join(__dirname, 'data/bitmapcorp_database.db'), { readonly: false });
+  console.log('Database connected');
+} catch (err) {
+  console.error('Database not found, API routes will return empty data:', err.message);
+}
+
+function getTableNames() {
+  if (!db) return [];
+  try {
+    return db.prepare("SELECT name FROM sqlite_master WHERE type='table'").all().map(r => r.name);
+  } catch (e) { return []; }
+}
+
+function tableExists(name) {
+  if (!db) return false;
+  try {
+    const r = db.prepare("SELECT count(*) as c FROM sqlite_master WHERE type='table' AND name=?").get(name);
+    return r && r.c > 0;
+  } catch (e) { return false; }
+}
+
+function sendSuccess(res, data) {
+  res.json({ success: true, data: data });
+}
+
+function sendError(res, msg, code) {
+  res.status(code || 500).json({ success: false, error: msg });
+}
+
+// ===== CLASSIFICATION ENDPOINTS (before catch-all) =====
+app.get('/api/v1/classify/status', (req, res) => {
+  if (!db) return sendSuccess(res, { classified: false });
+  try {
+    const hasTagTables = db.prepare("SELECT count(*) as c FROM sqlite_master WHERE type='table' AND name='tag_tables'").get().c > 0;
+    const hasTaggedBlocks = db.prepare("SELECT count(*) as c FROM sqlite_master WHERE type='table' AND name='tagged_blocks'").get().c > 0;
+    let tableCount = 0, blockCount = 0;
+    if (hasTagTables) tableCount = db.prepare('SELECT COUNT(*) as c FROM tag_tables').get().c;
+    if (hasTaggedBlocks) blockCount = db.prepare('SELECT COUNT(*) as c FROM tagged_blocks').get().c;
+    sendSuccess(res, { classified: hasTagTables && hasTaggedBlocks, tagTables: tableCount, taggedBlocks: blockCount });
+  } catch (err) {
+    sendError(res, err.message);
+  }
+});
+
+app.post('/api/v1/classify', async (req, res) => {
+  if (!db) return sendError(res, 'No database', 500);
+  try {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS tag_tables (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        tagName TEXT UNIQUE,
+        count INTEGER DEFAULT 0,
+        firstBlock INTEGER,
+        lastUpdated DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE TABLE IF NOT EXISTS tagged_blocks (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        bloque INTEGER,
+        tagName TEXT,
+        etiquetaIndividual TEXT,
+        totalBtc TEXT,
+        totalTransacciones TEXT,
+        etiquetas TEXT,
+        mempool TEXT,
+        hash TEXT,
+        total_etiquetas_en_bloque INTEGER
+      );
+      CREATE INDEX IF NOT EXISTS idx_tagged_blocks_tag ON tagged_blocks(tagName);
+      CREATE INDEX IF NOT EXISTS idx_tagged_blocks_bloque ON tagged_blocks(bloque);
+    `);
+
+    const CLASSIFICATION_TABLES = require('./classification-tables.js');
+
+    let totalProcessed = 0;
+    for (const table of CLASSIFICATION_TABLES) {
+      const tagName = table.tagName || table.name;
+      const query = 'SELECT * FROM blocks ' + table.query;
+      const blocks = db.prepare(query).all();
+      
+      if (blocks.length > 0) {
+        const insert = db.prepare(`
+          INSERT INTO tagged_blocks (bloque, tagName, etiquetaIndividual, totalBtc, totalTransacciones, etiquetas, mempool, hash, total_etiquetas_en_bloque)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, 
+            CASE WHEN ? IS NULL OR ? = '' THEN 0 
+                 ELSE (LENGTH(?) - LENGTH(REPLACE(?, '|', ''))) + 1 END
+          )
+        `);
+        const insertMany = db.transaction((items) => {
+          for (const item of items) {
+            const etiquetas = item.etiquetas || '';
+            insert.run(item.bloque, tagName, tagName, item.totalBtc, item.totalTransacciones, item.etiquetas, item.mempool, item.hash, etiquetas, etiquetas, etiquetas, etiquetas);
+          }
+        });
+        insertMany(blocks);
+        
+        db.prepare('INSERT OR REPLACE INTO tag_tables (tagName, count, firstBlock, lastUpdated) VALUES (?, ?, ?, datetime(\'now\'))')
+          .run(tagName, blocks.length, blocks[0].bloque);
+        
+        totalProcessed += blocks.length;
+      }
+    }
+
+    sendSuccess(res, { 
+      message: 'Clasificación completada', 
+      tablesProcessed: CLASSIFICATION_TABLES.length,
+      totalBlocksTagged: totalProcessed 
+    });
+  } catch (err) {
+    sendError(res, err.message);
+  }
+});
+
+// ===== BLOCKS (Table principal) =====
+app.get('/api/v1/blocks', (req, res) => {
+  if (!db) return sendSuccess(res, []);
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 20;
+    const offset = (page - 1) * limit;
+    const tables = getTableNames();
+
+    let countStmt, dataStmt;
+    if (tableExists('blocks')) {
+      countStmt = db.prepare('SELECT COUNT(*) as total FROM blocks');
+      dataStmt = db.prepare('SELECT * FROM blocks ORDER BY rowid DESC LIMIT ? OFFSET ?');
+    } else if (tableExists('tag_tables')) {
+      countStmt = db.prepare('SELECT COUNT(*) as total FROM tag_tables');
+      dataStmt = db.prepare('SELECT * FROM tag_tables ORDER BY rowid DESC LIMIT ? OFFSET ?');
+    } else {
+      return sendSuccess(res, { items: [], total: 0, page: page, limit: limit, tables: tables });
+    }
+
+    const total = countStmt.get().total;
+    const items = dataStmt.all(limit, offset);
+    sendSuccess(res, { items: items, total: total, page: page, limit: limit });
+  } catch (err) {
+    sendError(res, err.message);
+  }
+});
+
+app.get('/api/v1/blocks/search', (req, res) => {
+  if (!db) return sendSuccess(res, []);
+  try {
+    const q = req.query.q;
+    if (!q) return sendSuccess(res, []);
+    const num = parseInt(q);
+    let items;
+    if (!isNaN(num) && tableExists('blocks')) {
+      items = db.prepare('SELECT * FROM blocks WHERE bloque = ?').all(num);
+    } else if (tableExists('blocks')) {
+      items = db.prepare('SELECT * FROM blocks WHERE CAST(bloque AS TEXT) LIKE ?').all('%' + q + '%');
+    } else if (tableExists('tag_tables')) {
+      items = db.prepare('SELECT * FROM tag_tables WHERE tagName LIKE ?').all('%' + q + '%');
+    } else {
+      items = [];
+    }
+    sendSuccess(res, items);
+  } catch (err) {
+    sendError(res, err.message);
+  }
+});
+
+app.get('/api/v1/blocks/:id', (req, res) => {
+  if (!db) return sendError(res, 'No database', 404);
+  try {
+    const id = req.params.id;
+    const num = parseInt(id);
+    let block = null;
+
+    if (tableExists('blocks')) {
+      block = db.prepare('SELECT * FROM blocks WHERE bloque = ?').get(num);
+      if (!block) block = db.prepare('SELECT * FROM blocks WHERE rowid = ?').get(num);
+    }
+
+    if (!block && tableExists('block_specific_summary')) {
+      block = db.prepare('SELECT * FROM block_specific_summary WHERE blockNumber = ?').get(num);
+    }
+
+    if (!block) return sendError(res, 'Block not found', 404);
+
+    if (block && block.bloque !== undefined) {
+      block.blockNumber = block.bloque;
+      block.txCount = block.totalTransacciones;
+      block.txCount = block.totalTransacciones;
+      block.size = block.totalBtc;
+      block.date = block.etiquetas;
+    }
+
+    sendSuccess(res, block);
+  } catch (err) {
+    sendError(res, err.message);
+  }
+});
+
+app.get('/api/v1/blocks/:id/transactions', (req, res) => {
+  if (!db) return sendSuccess(res, []);
+  try {
+    const num = parseInt(req.params.id);
+    let transactions = [];
+    if (tableExists('block_specific_transactions')) {
+      transactions = db.prepare('SELECT * FROM block_specific_transactions WHERE blockNumber = ? ORDER BY transactionIndex ASC').all(num);
+    }
+    sendSuccess(res, transactions);
+  } catch (err) {
+    sendError(res, err.message);
+  }
+});
+
+// ===== TAGS =====
+app.get('/api/v1/tags', (req, res) => {
+  if (!db) return sendSuccess(res, []);
+  try {
+    let tags = [];
+    if (tableExists('tag_tables')) {
+      tags = db.prepare('SELECT * FROM tag_tables ORDER BY lastUpdated DESC').all();
+    }
+
+    // Corregir conteos para etiquetas especiales replicando lógica Android
+    // Usar tabla blocks (Tabla 1) para calcular conteos correctos replicando lógica DAO Android
+    const specialTagCounts = {};
+    
+    // txS millonarias - case-sensitive 'millonaria' (Android: etiquetas LIKE '%millonaria%')
+    try {
+      const millonariasStats = db.prepare(`
+        WITH RECURSIVE split_tags(bloque, etiqueta, rest) AS (
+          SELECT 
+            bloque,
+            CASE 
+              WHEN instr(etiquetas, '|') > 0 THEN trim(substr(etiquetas, 1, instr(etiquetas, '|') - 1))
+              ELSE trim(etiquetas)
+            END,
+            CASE 
+              WHEN instr(etiquetas, '|') > 0 THEN substr(etiquetas, instr(etiquetas, '|') + 1)
+              ELSE ''
+            END
+          FROM blocks
+          WHERE etiquetas LIKE '%millonaria%'
+          
+          UNION ALL
+          
+          SELECT 
+            bloque,
+            CASE 
+              WHEN instr(rest, '|') > 0 THEN trim(substr(rest, 1, instr(rest, '|') - 1))
+              ELSE trim(rest)
+            END,
+            CASE 
+              WHEN instr(rest, '|') > 0 THEN substr(rest, instr(rest, '|') + 1)
+              ELSE ''
+            END
+          FROM split_tags
+          WHERE rest != ''
+        )
+        SELECT COUNT(*) as totalEtiquetas, COUNT(DISTINCT bloque) as totalBloquesUnicos
+        FROM split_tags
+        WHERE etiqueta LIKE '%millonaria%'
+      `).get();
+      
+      if (millonariasStats) {
+        specialTagCounts['txS millonarias'] = {
+          count: millonariasStats.totalEtiquetas,
+          distinctBlocks: millonariasStats.totalBloquesUnicos
+        };
+      }
+    } catch (e) { console.log('Error millonarias stats:', e.message); }
+
+    // TXs MULTIMILLONARIAS - case-insensitive 'multimillonaria' (Android: lower(etiquetas) LIKE '%multimillonaria%')
+    try {
+      const multimillonariasStats = db.prepare(`
+        WITH RECURSIVE split_tags(bloque, etiqueta, rest) AS (
+          SELECT 
+            bloque,
+            CASE 
+              WHEN instr(etiquetas, '|') > 0 THEN trim(substr(etiquetas, 1, instr(etiquetas, '|') - 1))
+              ELSE trim(etiquetas)
+            END,
+            CASE 
+              WHEN instr(etiquetas, '|') > 0 THEN substr(etiquetas, instr(etiquetas, '|') + 1)
+              ELSE ''
+            END
+          FROM blocks
+          WHERE lower(etiquetas) LIKE '%multimillonaria%'
+          
+          UNION ALL
+          
+          SELECT 
+            bloque,
+            CASE 
+              WHEN instr(rest, '|') > 0 THEN trim(substr(rest, 1, instr(rest, '|') - 1))
+              ELSE trim(rest)
+            END,
+            CASE 
+              WHEN instr(rest, '|') > 0 THEN substr(rest, instr(rest, '|') + 1)
+              ELSE ''
+            END
+          FROM split_tags
+          WHERE rest != ''
+        )
+        SELECT COUNT(*) as totalEtiquetas, COUNT(DISTINCT bloque) as totalBloquesUnicos
+        FROM split_tags
+        WHERE lower(etiqueta) LIKE '%multimillonaria%'
+      `).get();
+      
+      if (multimillonariasStats) {
+        specialTagCounts['TXs MULTIMILLONARIAS'] = {
+          count: multimillonariasStats.totalEtiquetas,
+          distinctBlocks: multimillonariasStats.totalBloquesUnicos
+        };
+      }
+    } catch (e) { console.log('Error multimillonarias stats:', e.message); }
+
+    // Aplicar conteos corregidos a las tags
+    tags = tags.map(tag => {
+      const corrected = specialTagCounts[tag.tagName];
+      if (corrected) {
+        return { ...tag, count: corrected.count, distinctBlocks: corrected.distinctBlocks };
+      }
+      return tag;
+    });
+
+    sendSuccess(res, tags);
+  } catch (err) {
+    sendError(res, err.message);
+  }
+});
+
+app.get('/api/v1/tags/:tagName', (req, res) => {
+  if (!db) return sendSuccess(res, []);
+  try {
+    const tagName = req.params.tagName;
+    let blocks = [];
+    if (tableExists('tagged_blocks')) {
+      blocks = db.prepare('SELECT * FROM tagged_blocks WHERE tagName = ?').all(tagName);
+    }
+    sendSuccess(res, blocks);
+  } catch (err) {
+    sendError(res, err.message);
+  }
+});
+
+// ===== TAG PREVIEW (full block data for Mondrian) =====
+app.get('/api/v1/tags/:tagName/preview', (req, res) => {
+  if (!db) return sendSuccess(res, null);
+  try {
+    const tagName = req.params.tagName;
+    if (!tableExists('tagged_blocks') || !tableExists('tag_tables')) return sendSuccess(res, null);
+
+    // Para etiquetas especiales, calcular conteos replicando lógica Android
+    let stats = null;
+    if (tagName === 'txS millonarias' || tagName === 'TXs MULTIMILLONARIAS') {
+      const isMillonarias = tagName === 'txS millonarias';
+      const pattern = isMillonarias ? '%millonaria%' : '%multimillonaria%';
+      const caseSensitive = isMillonarias; // millonarias: case-sensitive, multimillonarias: case-insensitive
+      
+      const whereClause = isMillonarias 
+        ? "etiquetas LIKE '%millonaria%'"
+        : "lower(etiquetas) LIKE '%multimillonaria%'";
+      const filterClause = isMillonarias 
+        ? "etiqueta LIKE '%millonaria%'"
+        : "lower(etiqueta) LIKE '%multimillonaria%'";
+      
+      stats = db.prepare(`
+        WITH RECURSIVE split_tags(bloque, etiqueta, rest) AS (
+          SELECT 
+            bloque,
+            CASE 
+              WHEN instr(etiquetas, '|') > 0 THEN trim(substr(etiquetas, 1, instr(etiquetas, '|') - 1))
+              ELSE trim(etiquetas)
+            END,
+            CASE 
+              WHEN instr(etiquetas, '|') > 0 THEN substr(etiquetas, instr(etiquetas, '|') + 1)
+              ELSE ''
+            END
+          FROM blocks
+          WHERE ${whereClause}
+          
+          UNION ALL
+          
+          SELECT 
+            bloque,
+            CASE 
+              WHEN instr(rest, '|') > 0 THEN trim(substr(rest, 1, instr(rest, '|') - 1))
+              ELSE trim(rest)
+            END,
+            CASE 
+              WHEN instr(rest, '|') > 0 THEN substr(rest, instr(rest, '|') + 1)
+              ELSE ''
+            END
+          FROM split_tags
+          WHERE rest != ''
+        )
+        SELECT COUNT(*) as totalEtiquetas, COUNT(DISTINCT bloque) as totalBloquesUnicos
+        FROM split_tags
+        WHERE ${filterClause}
+      `).get();
+    } else {
+      // Etiquetas normales - usar tagged_blocks
+      stats = db.prepare(`
+        SELECT COUNT(*) as totalEtiquetas, COUNT(DISTINCT bloque) as totalBloquesUnicos
+        FROM tagged_blocks WHERE tagName = ?
+      `).get(tagName);
+    }
+
+    // Get the first tagged block with full data from blocks table
+    let tagged = null;
+    if (tagName === 'txS millonarias' || tagName === 'TXs MULTIMILLONARIAS') {
+      const pattern = tagName === 'txS millonarias' ? '%millonaria%' : '%multimillonaria%';
+      const whereClause = tagName === 'txS millonarias' 
+        ? "etiquetas LIKE '%millonaria%'"
+        : "lower(etiquetas) LIKE '%multimillonaria%'";
+      
+      // Get first block with this tag from blocks table
+      const firstBlock = db.prepare(`
+        SELECT * FROM blocks 
+        WHERE ${tagName === 'txS millonarias' ? "etiquetas LIKE '%millonaria%'" : "lower(etiquetas) LIKE '%multimillonaria%'"}
+        ORDER BY bloque ASC LIMIT 1
+      `).get();
+      
+      if (firstBlock) {
+        tagged = { bloque: firstBlock.bloque, etiquetas: firstBlock.etiquetas, totalTransacciones: firstBlock.totalTransacciones };
+      }
+    } else {
+      tagged = db.prepare('SELECT * FROM tagged_blocks WHERE tagName = ? ORDER BY bloque ASC LIMIT 1').get(tagName);
+    }
+
+    if (!tagged) return sendSuccess(res, null);
+
+    let block = null;
+    if (tableExists('blocks')) {
+      block = db.prepare('SELECT * FROM blocks WHERE bloque = ?').get(tagged.bloque);
+    }
+
+    const totalEtiquetas = stats ? stats.totalEtiquetas : 0;
+    const totalBloquesUnicos = stats ? stats.totalBloquesUnicos : 0;
+
+    if (block) {
+      block.blockNumber = block.bloque;
+      block.txCount = block.totalTransacciones;
+      block.etiquetas = tagged.etiquetas;
+      block.tagName = tagName;
+      block.totalEtiquetas = totalEtiquetas;
+      block.totalBloquesUnicos = totalBloquesUnicos;
+      sendSuccess(res, block);
+    } else {
+      tagged.blockNumber = tagged.bloque;
+      tagged.txCount = tagged.totalTransacciones;
+      tagged.totalEtiquetas = totalEtiquetas;
+      tagged.totalBloquesUnicos = totalBloquesUnicos;
+      sendSuccess(res, tagged);
+    }
+  } catch (err) {
+    sendError(res, err.message);
+  }
+});
+
+app.get('/api/v1/etiquetas-precio', (req, res) => {
+  if (!db) return sendSuccess(res, []);
+  try {
+    let items = [];
+    if (tableExists('etiquetas_por_precio')) {
+      items = db.prepare('SELECT * FROM etiquetas_por_precio ORDER BY precio ASC').all();
+    }
+    sendSuccess(res, items);
+  } catch (err) {
+    sendError(res, err.message);
+  }
+});
+
+app.get('/api/v1/etiquetas-precio/:rango', (req, res) => {
+  if (!db) return sendSuccess(res, []);
+  try {
+    let items = [];
+    if (tableExists('etiquetas_por_precio')) {
+      items = db.prepare('SELECT * FROM etiquetas_por_precio WHERE rangoPrecio = ?').all(req.params.rango);
+    }
+    sendSuccess(res, items);
+  } catch (err) {
+    sendError(res, err.message);
+  }
+});
+
+// ===== WALLET =====
+app.post('/api/v1/wallet/connect', (req, res) => {
+  if (!db) return sendError(res, 'No database', 500);
+  try {
+    const { address } = req.body;
+    if (!address) return sendError(res, 'Address required', 400);
+    db.prepare('CREATE TABLE IF NOT EXISTS wallets (address TEXT PRIMARY KEY, connectedAt DATETIME DEFAULT CURRENT_TIMESTAMP)').run();
+    db.prepare('INSERT OR REPLACE INTO wallets (address) VALUES (?)').run(address);
+    sendSuccess(res, { address, connected: true });
+  } catch (err) {
+    sendError(res, err.message);
+  }
+});
+
+app.get('/api/v1/wallet/:address/balance', (req, res) => {
+  if (!db) return sendSuccess(res, { balance: 0 });
+  try {
+    const { address } = req.params;
+    sendSuccess(res, { address, balance: 0, utxos: [] });
+  } catch (err) {
+    sendError(res, err.message);
+  }
+});
+
+app.get('/api/v1/wallet/:address/utxos', (req, res) => {
+  if (!db) return sendSuccess(res, []);
+  try {
+    sendSuccess(res, []);
+  } catch (err) {
+    sendError(res, err.message);
+  }
+});
+
+app.get('/api/v1/bitmasowner/:address', (req, res) => {
+  if (!db) return sendSuccess(res, []);
+  try {
+    sendSuccess(res, []);
+  } catch (err) {
+    sendError(res, err.message);
+  }
+});
+
+// ===== PSBT =====
+app.post('/api/v1/transaction/psbt', (req, res) => {
+  if (!db) return sendError(res, 'No database', 500);
+  try {
+    sendSuccess(res, { psbt: '' });
+  } catch (err) {
+    sendError(res, err.message);
+  }
+});
+
+app.post('/api/v1/transaction/psbt/sign', (req, res) => {
+  if (!db) return sendError(res, 'No database', 500);
+  try {
+    sendSuccess(res, { signedPsbt: '' });
+  } catch (err) {
+    sendError(res, err.message);
+  }
+});
+
+app.post('/api/v1/transaction/psbt/broadcast', (req, res) => {
+  if (!db) return sendError(res, 'No database', 500);
+  try {
+    sendSuccess(res, { txid: '' });
+  } catch (err) {
+    sendError(res, err.message);
+  }
+});
+
+// ===== MARKETPLACE =====
+app.get('/api/v1/descuentos', (req, res) => {
+  if (!db) return sendSuccess(res, []);
+  try {
+    sendSuccess(res, []);
+  } catch (err) {
+    sendError(res, err.message);
+  }
+});
+
+app.get('/api/v1/unified', (req, res) => {
+  if (!db) return sendSuccess(res, { allListings: [], stats: {} });
+  try {
+    sendSuccess(res, { allListings: [], stats: {} });
+  } catch (err) {
+    sendError(res, err.message);
+  }
+});
+
+app.get('/api/v1/proxy/ordinalswallet/listings', async (req, res) => {
+  try {
+    const response = await axios.get('https://api.ordinalswallet.com/collections/bitmap/listings', {
+      params: { limit: 100, offset: 0 }
+    });
+    sendSuccess(res, response.data);
+  } catch (err) {
+    sendError(res, err.message);
+  }
+});
+
+app.get('/api/v1/proxy/ordinalswallet/sold', async (req, res) => {
+  try {
+    const response = await axios.get('https://api.ordinalswallet.com/collections/bitmap/sold', {
+      params: { limit: 100, offset: 0 }
+    });
+    sendSuccess(res, response.data);
+  } catch (err) {
+    sendError(res, err.message);
+  }
+});
+
+app.get('/api/v1/proxy/ordinalswallet/stats', async (req, res) => {
+  try {
+    const response = await axios.get('https://api.ordinalswallet.com/collections/bitmap/stats');
+    sendSuccess(res, response.data);
+  } catch (err) {
+    sendError(res, err.message);
+  }
+});
+
+app.post('/api/v1/proxy/unisat/actions', async (req, res) => {
+  try {
+    const response = await axios.post('https://open-api.unisat.io/v1/indexer/actions', req.body, {
+      headers: { 'Content-Type': 'application/json' }
+    });
+    sendSuccess(res, response.data);
+  } catch (err) {
+    sendError(res, err.message);
+  }
+});
+
+app.get('/api/v1/proxy/unisat/listings', async (req, res) => {
+  try {
+    const response = await axios.get('https://open-api.unisat.io/v1/indexer/market/collection/bitmap/listings', {
+      params: { limit: 100, offset: 0 }
+    });
+    sendSuccess(res, response.data);
+  } catch (err) {
+    sendError(res, err.message);
+  }
+});
+
+// ===== SELECTOR SCREEN =====
+app.get('/api/v1/selector/previews', (req, res) => {
+  if (!db) return sendSuccess(res, []);
+  try {
+    let items = [];
+    if (tableExists('selector_previews')) {
+      items = db.prepare('SELECT * FROM selector_previews ORDER BY bubbleType, sortOrder').all();
+    }
+    sendSuccess(res, items);
+  } catch (err) {
+    sendError(res, err.message);
+  }
+});
+
+app.get('/api/v1/selector/stats', (req, res) => {
+  if (!db) return sendSuccess(res, []);
+  try {
+    let items = [];
+    if (tableExists('selector_bubble_stats')) {
+      items = db.prepare('SELECT * FROM selector_bubble_stats').all();
+    }
+    sendSuccess(res, items);
+  } catch (err) {
+    sendError(res, err.message);
+  }
+});
+
+// ===== DB INFO =====
+app.get('/api/v1/db/tables', (req, res) => {
+  const tables = getTableNames();
+  sendSuccess(res, tables);
+});
+
+// ===== HEALTH =====
+app.get('/api/v1/health', (req, res) => {
+  sendSuccess(res, {
+    status: 'ok',
+    port: PORT,
+    database: db ? 'connected' : 'not connected',
+    tables: getTableNames()
+  });
+});
+
+// ===== SPA CATCH-ALL =====
+app.get('*', (req, res) => {
+  res.sendFile(path.join(publicDir, 'index.html'));
+});
+
+app.listen(PORT, '0.0.0.0', () => {
+  console.log('BitmapCore Web running on port ' + PORT);
+  console.log('Database tables:', getTableNames().join(', ') || 'none');
+});
