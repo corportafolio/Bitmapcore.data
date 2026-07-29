@@ -36,19 +36,16 @@ function HeaderBar(props) {
       onClick: onMenuToggle,
       className:'font-alfaslab text-white text-xl mr-2 lg:hidden'
     }, '\u2261') : null,
-    !showBackButton ? React.createElement('button', {
-      onClick: function() { navigate('/selector'); },
-      className:'font-alfaslab text-bitmap-orange text-xs px-3 py-1 border border-bitmap-orange rounded-lg hover:bg-bitmap-orange hover:text-black transition-colors mr-2'
-    },
-      React.createElement('span', { className:'mr-1' }, '\uD83D\uDCCA'),
-      'Mercados Bitmap'
-    ) : null,
     !showBackButton ? React.createElement('div', { className:'flex items-center gap-2 cursor-pointer', onClick: function() { navigate('/'); } },
       React.createElement('img', { src:'logo_bitmapcore_logo.png', alt:'BitmapCore', className:'h-6 w-6 object-contain' }),
       React.createElement('span', { className:'font-howdybun text-bitmap-orange text-lg tracking-wide hidden sm:block' }, 'Bitmapcore'),
       btcPrice ? React.createElement('span', { className:'font-acme text-xs text-bitmap-text ml-2' }, 'BTC $' + Number(btcPrice).toLocaleString()) : null
     ) : null,
-    title ? React.createElement('span', { className: showBackButton ? 'font-alfaslab text-white text-lg flex-1 text-center' : 'font-alfaslab text-white text-lg flex-1' }, title) : null,
+    title ? React.createElement('span', { className: showBackButton ? 'font-alfaslab text-white text-lg flex-1 text-center' : 'font-alfaslab text-white text-lg flex-1' }, title) : React.createElement('div', { className:'flex-1' }),
+    !showBackButton ? React.createElement('button', {
+      onClick: function() { navigate('/selector'); },
+      className:'font-alfaslab text-bitmap-orange text-xs px-2 py-1 border border-bitmap-orange rounded hover:bg-bitmap-orange hover:text-black transition-colors mr-2 whitespace-nowrap'
+    }, 'Mercados Bitmap') : null,
     React.createElement('div', { className:'relative' },
       React.createElement('button', {
         onClick: function(e) { e.stopPropagation(); setShowHamburgerMenu(!showHamburgerMenu); },
