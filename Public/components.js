@@ -174,7 +174,13 @@ function FloatingMarketplaceMenu(props) {
       className:'fm-toggle',
       onClick:function() { setIsOpen(!isOpen); },
       title:'Marketplaces'
-    }, '\u22EE'),
+    },
+      React.createElement('svg', { width:'18', height:'24', viewBox:'0 0 18 24', fill:'var(--bitmap-orange)' },
+        React.createElement('circle', { cx:'9', cy:'4', r:'2.5' }),
+        React.createElement('circle', { cx:'9', cy:'12', r:'2.5' }),
+        React.createElement('circle', { cx:'9', cy:'20', r:'2.5' })
+      )
+    ),
     isOpen ? items.map(function(item) {
       return React.createElement('button', {
         key:item.id,
