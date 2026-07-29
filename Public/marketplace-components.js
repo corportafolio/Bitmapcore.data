@@ -120,3 +120,53 @@ function DiscountBadge(props) {
     )
   );
 }
+
+function SelectorBubble(props) {
+  var name = props.name;
+  var logo = props.logo;
+  var icon = props.icon;
+  var listings = props.listings || 0;
+  var floorPrice = props.floorPrice || 0;
+  var sold = props.sold || 0;
+  var previews = props.previews || [];
+  var onClick = props.onClick;
+
+  var floorBtc = floorPrice > 0 && floorPrice !== 0x7fffffffffffffff ? BitmapUtils.formatBtc(floorPrice) : 'N/A';
+  var listingsFmt = listings > 0 ? listings.toLocaleString() : 'N/A';
+
+  return React.createElement('button', {
+    onClick: onClick,
+    className:'w-full bg-bitmap-surface border border-bitmap-border rounded-xl p-3 hover:border-bitmap-orange transition-all text-left'
+  },
+    React.createElement('div', { className:'flex items-center justify-between mb-2' },
+      React.createElement('span', { className:'font-alfaslab text-sm text-white tracking-wide' }, name),
+      logo ? React.createElement('img', { src:logo, alt:name, className:'h-8 w-8 object-contain' }) :
+      icon ? React.createElement('span', { className:'text-xl' }, icon) : null
+    ),
+    React.createElement('div', { className:'flex gap-2 mb-2' },
+      React.createElement('span', { className:'font-acme text-xs text-bitmap-muted' },
+        React.createElement('span', { className:'text-bitmap-orange' }, 'Listados: '), listingsFmt
+      ),
+      React.createElement('span', { className:'font-acme text-xs text-bitmap-muted' },
+        ' / ',
+        React.createElement('span', { className:'text-bitmap-orange' }, 'Piso: '), floorBtc
+      )
+    ),
+    previews.length > 0 ? React.createElement('div', { className:'flex gap-2' },
+      previews.map(function(preview, i) {
+        var priceBtc = preview.listedPrice ? (preview.listedPrice / 100000000).toFixed(5) : 'N/A';
+        return React.createElement('div', {
+          key: i,
+          className:'flex flex-col items-center bg-bitmap-black rounded-lg p-1 min-w-[60px]'
+        },
+          React.createElement('span', { className:'font-acme text-[10px] text-bitmap-orange-light' }, priceBtc),
+          preview.tagName ? React.createElement('span', { className:'font-acme text-[8px] text-bitmap-muted truncate max-w-[56px]' }, preview.tagName) : null,
+          React.createElement('div', { className:'w-12 h-12 rounded bg-bitmap-surface flex items-center justify-center mt-1' },
+            React.createElement('span', { className:'font-alfaslab text-[10px] text-bitmap-orange' }, '#' + (preview.blockNumber || '?'))
+          ),
+          preview.source ? React.createElement('span', { className:'font-acme text-[8px] text-bitmap-muted mt-0.5' }, preview.source) : null
+        );
+      })
+    ) : React.createElement('div', { className:'font-acme text-[10px] text-bitmap-muted' }, 'Sin previsualizaciones')
+  );
+}

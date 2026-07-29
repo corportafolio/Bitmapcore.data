@@ -27,6 +27,7 @@
     return React.createElement(Routes, null,
       React.createElement(Route, { path:'/', element:wrapper(HomePage) }),
       React.createElement(Route, { path:'/marketplace', element:wrapper(MarketplaceSelectorPage) }),
+      React.createElement(Route, { path:'/selector', element:wrapper(SelectorScreenPage) }),
       React.createElement(Route, { path:'/ordinalswallet', element:wrapper(OrdinalswalletPage) }),
       React.createElement(Route, { path:'/unisat', element:wrapper(UnisatPage) }),
       React.createElement(Route, { path:'/local', element:wrapper(LocalPage) }),
