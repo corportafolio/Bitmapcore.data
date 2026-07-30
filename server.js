@@ -13,7 +13,7 @@ app.use(cors({
 }));
 app.use(express.json());
 
-const publicDir = path.join(__dirname, 'public');
+const publicDir = path.join(__dirname, 'Public');
 app.use(express.static(publicDir));
 
 let db = null;
@@ -785,11 +785,11 @@ app.get('/api/v1/ordinalswallet/cache/listings', (req, res) => {
     const sortBy = req.query.sort || 'listedAtDesc';
     let rows;
     if (sortBy === 'priceDesc') {
-      rows = dbOw.prepare('SELECT * FROM ordinalswallet_cache WHERE bitmapId != "" ORDER BY listedPrice DESC, listedAt DESC').all();
+      rows = dbOw.prepare("SELECT * FROM ordinalswallet_cache WHERE bitmapId != '' ORDER BY listedPrice DESC, listedAt DESC").all();
     } else if (sortBy === 'priceAsc') {
-      rows = dbOw.prepare('SELECT * FROM ordinalswallet_cache WHERE bitmapId != "" ORDER BY listedPrice ASC, listedAt DESC').all();
+      rows = dbOw.prepare("SELECT * FROM ordinalswallet_cache WHERE bitmapId != '' ORDER BY listedPrice ASC, listedAt DESC").all();
     } else {
-      rows = dbOw.prepare('SELECT * FROM ordinalswallet_cache WHERE bitmapId != "" ORDER BY listedAt DESC, insertionOrder DESC').all();
+      rows = dbOw.prepare("SELECT * FROM ordinalswallet_cache WHERE bitmapId != '' ORDER BY listedAt DESC, insertionOrder DESC").all();
     }
     sendSuccess(res, rows);
   } catch (err) {
@@ -821,7 +821,7 @@ app.get('/api/v1/ordinalswallet/cache/last-update', (req, res) => {
 app.get('/api/v1/ordinalswallet/cache/count', (req, res) => {
   if (!dbOw) return sendSuccess(res, { count: 0 });
   try {
-    const row = dbOw.prepare('SELECT COUNT(*) as c FROM ordinalswallet_cache WHERE bitmapId != ""').get();
+    const row = dbOw.prepare("SELECT COUNT(*) as c FROM ordinalswallet_cache WHERE bitmapId != ''").get();
     sendSuccess(res, { count: row ? row.c : 0 });
   } catch (err) {
     sendError(res, err.message);
