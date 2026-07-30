@@ -24,20 +24,23 @@ var StoreMarketplaces = {
   fetchOrdinalswallet: function() {
     StoreMarketplaces._state.ordinalswallet.isLoading = true;
     StoreMarketplaces._emit('ordinalswallet');
-    MarketplaceApi.getOrdinalswallet().then(function(data) {
-      var listings = data.data || data || [];
-      if (!Array.isArray(listings)) listings = [];
-      var floor = 0;
-      if (listings.length > 0) {
-        var prices = listings.map(function(l) { return l.price || 0; }).filter(function(p) { return p > 0; });
-        floor = prices.length > 0 ? Math.min.apply(null, prices) : 0;
-      }
-      StoreMarketplaces._state.ordinalswallet = { listings:listings, floorPrice:floor, soldCount:listings.length, images:[], isLoading:false, error:null };
+    OrdinalswalletViewModel.loadFromCacheOnly();
+    var checkData = function() {
+      var vm = OrdinalswalletViewModel;
+      StoreMarketplaces._state.ordinalswallet = {
+        listings: vm.getListings(),
+        floorPrice: vm.getFloorPrice(),
+        soldCount: vm.getTotalListings(),
+        images: [],
+        isLoading: false,
+        error: null
+      };
       StoreMarketplaces._emit('ordinalswallet');
-    }).catch(function(e) {
-      StoreMarketplaces._state.ordinalswallet.isLoading = false;
-      StoreMarketplaces._state.ordinalswallet.error = e.message;
-      StoreMarketplaces._emit('ordinalswallet');
+    };
+    setTimeout(checkData, 800);
+    var unsub = OrdinalswalletViewModel.subscribe('stats', function() {
+      checkData();
+      unsub();
     });
   },
   fetchUnisat: function() {

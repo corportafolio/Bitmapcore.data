@@ -24,6 +24,38 @@ try {
   console.error('Database not found, API routes will return empty data:', err.message);
 }
 
+let dbOw = null;
+try {
+  const fs = require('fs');
+  const dataDir = path.join(__dirname, 'data');
+  if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
+  dbOw = new Database(path.join(dataDir, 'ordinalswallet_cache.db'));
+  dbOw.pragma('journal_mode = WAL');
+  dbOw.exec(`
+    CREATE TABLE IF NOT EXISTS ordinalswallet_cache (
+      bitmapNumber  INTEGER,
+      bitmapId      TEXT PRIMARY KEY,
+      listedPrice   INTEGER,
+      listedAt      INTEGER,
+      ownerAddress  TEXT,
+      extraData     TEXT,
+      extraData2    TEXT,
+      timestamp     INTEGER DEFAULT 0,
+      insertionOrder INTEGER
+    );
+    CREATE INDEX IF NOT EXISTS idx_ow_listedAt ON ordinalswallet_cache(listedAt DESC);
+    CREATE INDEX IF NOT EXISTS idx_ow_insertion ON ordinalswallet_cache(insertionOrder DESC);
+    CREATE TABLE IF NOT EXISTS ordinalswallet_stats (
+      key       TEXT PRIMARY KEY,
+      value     INTEGER,
+      updatedAt INTEGER
+    );
+  `);
+  console.log('Ordinalswallet cache DB connected');
+} catch (err) {
+  console.error('Ordinalswallet cache DB not created:', err.message);
+}
+
 function getTableNames() {
   if (!db) return [];
   try {
@@ -588,10 +620,14 @@ app.get('/api/v1/unified', (req, res) => {
   }
 });
 
+// ===== PROXY ORDINALSWALLET (URLs correctas: turbo.ordinalswallet.com) =====
 app.get('/api/v1/proxy/ordinalswallet/listings', async (req, res) => {
   try {
-    const response = await axios.get('https://api.ordinalswallet.com/collections/bitmap/listings', {
-      params: { limit: 100, offset: 0 }
+    const offset = parseInt(req.query.offset) || 0;
+    const limit = parseInt(req.query.limit) || 60;
+    const response = await axios.get('https://turbo.ordinalswallet.com/collection/bitmap/escrows', {
+      params: { offset, limit },
+      timeout: 15000
     });
     sendSuccess(res, response.data);
   } catch (err) {
@@ -601,8 +637,9 @@ app.get('/api/v1/proxy/ordinalswallet/listings', async (req, res) => {
 
 app.get('/api/v1/proxy/ordinalswallet/sold', async (req, res) => {
   try {
-    const response = await axios.get('https://api.ordinalswallet.com/collections/bitmap/sold', {
-      params: { limit: 100, offset: 0 }
+    const response = await axios.get('https://turbo.ordinalswallet.com/collection/bitmap/sold-escrows', {
+      params: { limit: parseInt(req.query.limit) || 100, offset: parseInt(req.query.offset) || 0 },
+      timeout: 15000
     });
     sendSuccess(res, response.data);
   } catch (err) {
@@ -612,7 +649,9 @@ app.get('/api/v1/proxy/ordinalswallet/sold', async (req, res) => {
 
 app.get('/api/v1/proxy/ordinalswallet/stats', async (req, res) => {
   try {
-    const response = await axios.get('https://api.ordinalswallet.com/collections/bitmap/stats');
+    const response = await axios.get('https://turbo.ordinalswallet.com/collection/bitmap/stats', {
+      timeout: 10000
+    });
     sendSuccess(res, response.data);
   } catch (err) {
     sendError(res, err.message);
@@ -636,6 +675,154 @@ app.get('/api/v1/proxy/unisat/listings', async (req, res) => {
       params: { limit: 100, offset: 0 }
     });
     sendSuccess(res, response.data);
+  } catch (err) {
+    sendError(res, err.message);
+  }
+});
+
+// ===== ORDINALSWALLET POLLING SERVICE + CACHE =====
+
+function parseCreatedTimestamp(created) {
+  if (!created) return 0;
+  try {
+    const fixed = created.replace('+00', '+00:00');
+    const cleaned = fixed.replace(/\.(\d{3})\d+/, '.$1');
+    const t = new Date(cleaned).getTime();
+    if (!isNaN(t) && t > 0) return t;
+    const cleaned2 = fixed.replace(/\.\d+/, '');
+    const t2 = new Date(cleaned2).getTime();
+    return (!isNaN(t2) && t2 > 0) ? t2 : 0;
+  } catch (e) { return 0; }
+}
+
+function parseBitmapNumber(name) {
+  if (!name) return 0;
+  const m = name.match(/(\d+)/);
+  return m ? parseInt(m[1]) : 0;
+}
+
+let owPollingActive = false;
+let owLastPollTime = 0;
+
+async function pollOrdinalswallet() {
+  if (owPollingActive) return;
+  if (!dbOw) return;
+  owPollingActive = true;
+  try {
+    const statsRes = await axios.get('https://turbo.ordinalswallet.com/collection/bitmap/stats', { timeout: 10000 });
+    const newFloor = statsRes.data.floor_price || 0;
+    const newListed = statsRes.data.listed || 0;
+
+    const prevFloor = (dbOw.prepare("SELECT value FROM ordinalswallet_stats WHERE key='floor_price'").get() || {}).value || 0;
+    const prevListed = (dbOw.prepare("SELECT value FROM ordinalswallet_stats WHERE key='total_listed'").get() || {}).value || 0;
+
+    if (newFloor === prevFloor && newListed === prevListed && prevListed > 0) {
+      console.log('[OW] Stats unchanged, skipping token fetch');
+      owPollingActive = false;
+      return;
+    }
+
+    console.log('[OW] Stats changed (listed: ' + prevListed + '->' + newListed + ', floor: ' + prevFloor + '->' + newFloor + '), fetching 300 tokens...');
+
+    const insertStmt = dbOw.prepare(`
+      INSERT OR REPLACE INTO ordinalswallet_cache
+      (bitmapNumber, bitmapId, listedPrice, listedAt, ownerAddress, extraData, extraData2, timestamp, insertionOrder)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+
+    let totalSaved = 0;
+    let insertionOrder = 1;
+    const now = Date.now();
+
+    for (let offset = 0; offset < 300; offset += 60) {
+      try {
+        const escrowsRes = await axios.get('https://turbo.ordinalswallet.com/collection/bitmap/escrows', {
+          params: { offset, limit: 60 },
+          timeout: 15000
+        });
+        const escrows = Array.isArray(escrowsRes.data) ? escrowsRes.data : [];
+        for (const e of escrows) {
+          insertStmt.run(
+            parseBitmapNumber(e.name),
+            e.inscription_id || '',
+            e.satoshi_price || 0,
+            parseCreatedTimestamp(e.created),
+            e.seller_address || '',
+            e.name || '',
+            null,
+            now,
+            insertionOrder++
+          );
+          totalSaved++;
+        }
+        console.log('[OW] Offset ' + offset + ': ' + escrows.length + ' escrows');
+      } catch (e) {
+        console.error('[OW] Error fetching offset ' + offset + ':', e.message);
+      }
+    }
+
+    dbOw.prepare("INSERT OR REPLACE INTO ordinalswallet_stats (key, value, updatedAt) VALUES ('floor_price', ?, ?)").run(newFloor, now);
+    dbOw.prepare("INSERT OR REPLACE INTO ordinalswallet_stats (key, value, updatedAt) VALUES ('total_listed', ?, ?)").run(newListed, now);
+    dbOw.prepare("INSERT OR REPLACE INTO ordinalswallet_stats (key, value, updatedAt) VALUES ('last_poll_time', ?, ?)").run(now, now);
+
+    console.log('[OW] Poll complete: ' + totalSaved + ' tokens saved, floor=' + newFloor + ', listed=' + newListed);
+    owLastPollTime = now;
+  } catch (err) {
+    console.error('[OW] Poll error:', err.message);
+  }
+  owPollingActive = false;
+}
+
+// Start polling on server startup
+pollOrdinalswallet();
+setInterval(pollOrdinalswallet, 300000);
+
+// ===== ENDPOINTS DE CACHE ORDINALSWALLET =====
+
+app.get('/api/v1/ordinalswallet/cache/listings', (req, res) => {
+  if (!dbOw) return sendSuccess(res, []);
+  try {
+    const sortBy = req.query.sort || 'listedAtDesc';
+    let rows;
+    if (sortBy === 'priceDesc') {
+      rows = dbOw.prepare('SELECT * FROM ordinalswallet_cache WHERE bitmapId != "" ORDER BY listedPrice DESC, listedAt DESC').all();
+    } else if (sortBy === 'priceAsc') {
+      rows = dbOw.prepare('SELECT * FROM ordinalswallet_cache WHERE bitmapId != "" ORDER BY listedPrice ASC, listedAt DESC').all();
+    } else {
+      rows = dbOw.prepare('SELECT * FROM ordinalswallet_cache WHERE bitmapId != "" ORDER BY listedAt DESC, insertionOrder DESC').all();
+    }
+    sendSuccess(res, rows);
+  } catch (err) {
+    sendError(res, err.message);
+  }
+});
+
+app.get('/api/v1/ordinalswallet/cache/stats', (req, res) => {
+  if (!dbOw) return sendSuccess(res, { floorPrice: 0, totalListed: 0 });
+  try {
+    const floor = (dbOw.prepare("SELECT value FROM ordinalswallet_stats WHERE key='floor_price'").get() || {}).value || 0;
+    const listed = (dbOw.prepare("SELECT value FROM ordinalswallet_stats WHERE key='total_listed'").get() || {}).value || 0;
+    sendSuccess(res, { floorPrice: floor, totalListed: listed });
+  } catch (err) {
+    sendError(res, err.message);
+  }
+});
+
+app.get('/api/v1/ordinalswallet/cache/last-update', (req, res) => {
+  if (!dbOw) return sendSuccess(res, { lastUpdate: 0 });
+  try {
+    const row = dbOw.prepare("SELECT value FROM ordinalswallet_stats WHERE key='last_poll_time'").get();
+    sendSuccess(res, { lastUpdate: row ? row.value : 0 });
+  } catch (err) {
+    sendError(res, err.message);
+  }
+});
+
+app.get('/api/v1/ordinalswallet/cache/count', (req, res) => {
+  if (!dbOw) return sendSuccess(res, { count: 0 });
+  try {
+    const row = dbOw.prepare('SELECT COUNT(*) as c FROM ordinalswallet_cache WHERE bitmapId != ""').get();
+    sendSuccess(res, { count: row ? row.c : 0 });
   } catch (err) {
     sendError(res, err.message);
   }
@@ -680,7 +867,10 @@ app.get('/api/v1/health', (req, res) => {
     status: 'ok',
     port: PORT,
     database: db ? 'connected' : 'not connected',
-    tables: getTableNames()
+    ordinalswalletCache: dbOw ? 'connected' : 'not connected',
+    tables: getTableNames(),
+    owPollingActive: owPollingActive,
+    owLastPollTime: owLastPollTime
   });
 });
 
@@ -692,4 +882,5 @@ app.get('*', (req, res) => {
 app.listen(PORT, '0.0.0.0', () => {
   console.log('BitmapCore Web running on port ' + PORT);
   console.log('Database tables:', getTableNames().join(', ') || 'none');
+  console.log('Ordinalswallet cache:', dbOw ? 'connected' : 'not connected');
 });
