@@ -709,20 +709,7 @@ async function pollOrdinalswallet() {
   if (!dbOw) return;
   owPollingActive = true;
   try {
-    const statsRes = await axios.get('https://turbo.ordinalswallet.com/collection/bitmap/stats', { timeout: 10000 });
-    const newFloor = statsRes.data.floor_price || 0;
-    const newListed = statsRes.data.listed || 0;
-
-    const prevFloor = (dbOw.prepare("SELECT value FROM ordinalswallet_stats WHERE key='floor_price'").get() || {}).value || 0;
-    const prevListed = (dbOw.prepare("SELECT value FROM ordinalswallet_stats WHERE key='total_listed'").get() || {}).value || 0;
-
-    if (newFloor === prevFloor && newListed === prevListed && prevListed > 0) {
-      console.log('[OW] Stats unchanged, skipping token fetch');
-      owPollingActive = false;
-      return;
-    }
-
-    console.log('[OW] Stats changed (listed: ' + prevListed + '->' + newListed + ', floor: ' + prevFloor + '->' + newFloor + '), fetching 300 tokens...');
+    console.log('[OW] Fetching listings from OrdinalsWallet...');
 
     const insertStmt = dbOw.prepare(`
       INSERT OR REPLACE INTO ordinalswallet_cache
@@ -761,11 +748,17 @@ async function pollOrdinalswallet() {
       }
     }
 
-    dbOw.prepare("INSERT OR REPLACE INTO ordinalswallet_stats (key, value, updatedAt) VALUES ('floor_price', ?, ?)").run(newFloor, now);
-    dbOw.prepare("INSERT OR REPLACE INTO ordinalswallet_stats (key, value, updatedAt) VALUES ('total_listed', ?, ?)").run(newListed, now);
+    const minPriceRow = dbOw.prepare("SELECT MIN(listedPrice) as minPrice FROM ordinalswallet_cache WHERE bitmapId != '' AND listedPrice > 0").get();
+    const calculatedFloor = minPriceRow ? minPriceRow.minPrice : 0;
+
+    const countRow = dbOw.prepare("SELECT COUNT(*) as c FROM ordinalswallet_cache WHERE bitmapId != ''").get();
+    const calculatedListed = countRow ? countRow.c : 0;
+
+    dbOw.prepare("INSERT OR REPLACE INTO ordinalswallet_stats (key, value, updatedAt) VALUES ('floor_price', ?, ?)").run(calculatedFloor, now);
+    dbOw.prepare("INSERT OR REPLACE INTO ordinalswallet_stats (key, value, updatedAt) VALUES ('total_listed', ?, ?)").run(calculatedListed, now);
     dbOw.prepare("INSERT OR REPLACE INTO ordinalswallet_stats (key, value, updatedAt) VALUES ('last_poll_time', ?, ?)").run(now, now);
 
-    console.log('[OW] Poll complete: ' + totalSaved + ' tokens saved, floor=' + newFloor + ', listed=' + newListed);
+    console.log('[OW] Poll complete: ' + totalSaved + ' tokens saved, floor=' + calculatedFloor + ', listed=' + calculatedListed);
     owLastPollTime = now;
   } catch (err) {
     console.error('[OW] Poll error:', err.message);
