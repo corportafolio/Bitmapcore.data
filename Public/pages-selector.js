@@ -21,7 +21,7 @@ function SelectorScreenPage(props) {
     return function() { clearTimeout(timer); };
   }, []);
 
-  return React.createElement('div', { className:'p-3' },
+  return React.createElement('div', { className:'pl-14 pr-3 py-3' },
     isLoading ? React.createElement('div', { className:'flex-1 flex items-center justify-center' },
       React.createElement('p', { className:'font-acme text-bitmap-muted' }, I18n.t ? I18n.t('app.loading') : 'Cargando...')
     ) :

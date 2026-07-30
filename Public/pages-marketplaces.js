@@ -106,7 +106,7 @@ function OrdinalswalletPage(props) {
   }, [showSortMenu]);
 
   return React.createElement('div', { className: 'flex flex-col h-full' },
-    React.createElement('div', { className: 'bg-bitmap-surface border-b border-bitmap-border px-4 py-2' },
+    React.createElement('div', { className: 'bg-bitmap-surface border-b border-bitmap-border pl-14 pr-4 py-2' },
       React.createElement('div', { className: 'flex items-center gap-2 flex-wrap' },
         React.createElement('span', { className: 'font-alfaslab text-sm text-white tracking-wide' }, 'Ordinalswallet Marketplace'),
         React.createElement('span', { className: 'font-acme text-xs text-bitmap-muted ml-2 hidden sm:inline' },
@@ -145,7 +145,7 @@ function OrdinalswalletPage(props) {
         )
       )
     ),
-    React.createElement('div', { className: 'px-4 py-2 border-b border-bitmap-border' },
+    React.createElement('div', { className: 'pl-14 pr-4 py-2 border-b border-bitmap-border' },
       React.createElement('input', {
         type: 'text',
         value: searchQuery,
@@ -158,7 +158,7 @@ function OrdinalswalletPage(props) {
       ? React.createElement('div', { className: 'flex items-center justify-center py-16' },
           React.createElement('div', { className: 'font-acme text-bitmap-muted' }, 'Cargando datos...')
         )
-      : React.createElement('div', { className: 'flex-1 overflow-y-auto' },
+      : React.createElement('div', { className: 'flex-1 overflow-y-auto pl-14 pr-4' },
           filtered.length === 0
             ? React.createElement('div', { className: 'text-center py-16 font-acme text-bitmap-muted' }, 'No hay listados disponibles')
             : React.createElement('div', { className: 'divide-y divide-bitmap-border' },
