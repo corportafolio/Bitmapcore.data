@@ -92,56 +92,63 @@ function OrdinalswalletPage(props) {
     });
   }
 
+  var _k = React.useState(false);
+  var showSortMenu = _k[0];
+  var setShowSortMenu = _k[1];
+
+  var sortLabel = { listedAtDesc: 'Recientes', priceDesc: '$ Alto', priceAsc: '$ Bajo' };
+
+  React.useEffect(function() {
+    if (!showSortMenu) return;
+    var close = function() { setShowSortMenu(false); };
+    window.addEventListener('click', close);
+    return function() { window.removeEventListener('click', close); };
+  }, [showSortMenu]);
+
   return React.createElement('div', { className: 'flex flex-col h-full' },
-    React.createElement('div', { className: 'bg-bitmap-surface border-b border-bitmap-border px-4 py-3' },
-      React.createElement('div', { className: 'flex items-center gap-2 mb-1' },
+    React.createElement('div', { className: 'bg-bitmap-surface border-b border-bitmap-border px-4 py-2' },
+      React.createElement('div', { className: 'flex items-center gap-2 flex-wrap' },
         React.createElement('button', {
           onClick: function() { navigate('/marketplace'); },
           className: 'text-bitmap-orange hover:text-white font-acme text-sm'
         }, '\u2190'),
         React.createElement('img', { src: 'ordinalswallet_logo.png', alt: '', className: 'h-5 w-5 object-contain' }),
-        React.createElement('span', { className: 'font-alfaslab text-sm text-white tracking-wide' }, 'Ordinalswallet Marketplace')
-      ),
-      React.createElement('div', { className: 'flex justify-between items-center mt-1' },
-        React.createElement('span', { className: 'font-acme text-sm text-bitmap-text' },
+        React.createElement('span', { className: 'font-alfaslab text-sm text-white tracking-wide' }, 'Ordinalswallet Marketplace'),
+        React.createElement('span', { className: 'font-acme text-xs text-bitmap-muted ml-2 hidden sm:inline' },
+          'actualizado: ',
+          React.createElement('span', { className: 'text-bitmap-orange font-bold', onClick: handleRefresh, style:{cursor:'pointer'} }, timeStr)
+        ),
+        React.createElement('span', { className: 'font-acme text-xs text-bitmap-muted hidden sm:inline' },
+          'cargados: ',
+          React.createElement('span', { className: 'text-bitmap-orange font-bold' }, cacheCount + ' / ' + BitmapUtils.formatNumber(totalListings))
+        ),
+        React.createElement('span', { className: 'font-acme text-xs text-bitmap-text ml-auto hidden md:inline' },
           'listados: ',
           React.createElement('span', { className: 'text-bitmap-orange font-bold' }, BitmapUtils.formatNumber(totalListings))
         ),
-        React.createElement('span', { className: 'font-acme text-sm text-bitmap-text' },
+        React.createElement('span', { className: 'font-acme text-xs text-bitmap-text hidden md:inline' },
           'Piso: ',
           React.createElement('span', { className: 'text-bitmap-orange font-bold' }, floorBtc + ' BTC')
+        ),
+        React.createElement('div', { className: 'relative ml-auto md:ml-2' },
+          React.createElement('button', {
+            onClick: function(e) { e.stopPropagation(); setShowSortMenu(!showSortMenu); },
+            className: 'px-2 py-1 rounded font-acme text-xs bg-bitmap-surface text-bitmap-text border border-bitmap-border hover:border-bitmap-orange transition-colors'
+          }, 'orden: ' + sortLabel[currentSort] + ' \u25BE'),
+          showSortMenu ? React.createElement('div', {
+            className: 'absolute right-0 top-full mt-1 w-32 bg-bitmap-black border border-bitmap-border rounded-lg shadow-lg z-50 py-1'
+          },
+            sortButtons.map(function(btn) {
+              return React.createElement('button', {
+                key: btn.key,
+                onClick: function(e) { e.stopPropagation(); handleSort(btn.key); setShowSortMenu(false); },
+                className: 'w-full px-3 py-1.5 text-left font-acme text-xs transition-colors ' +
+                  (currentSort === btn.key ? 'bg-bitmap-orange text-black font-bold' : 'text-bitmap-text hover:bg-bitmap-surface')
+              }, btn.label);
+            })
+          ) : null
         )
       )
-    ),
-    React.createElement('div', { className: 'flex items-center gap-2 px-4 py-2 border-b border-bitmap-border' },
-      sortButtons.map(function(btn) {
-        var isActive = currentSort === btn.key;
-        return React.createElement('button', {
-          key: btn.key,
-          onClick: function() { handleSort(btn.key); },
-          className: 'px-3 py-1.5 rounded-lg font-acme text-xs transition-colors ' +
-            (isActive ? 'bg-bitmap-orange text-black font-bold' : 'bg-bitmap-surface text-bitmap-text border border-bitmap-border hover:border-bitmap-orange')
-        }, btn.label);
-      }),
-      React.createElement('img', {
-        src: 'ordinalswallet_logo.png',
-        alt: 'Ordinalswallet',
-        onClick: function() { window.open('https://magiceden.io/ordinals/marketplace/bitmap', '_blank'); },
-        className: 'h-7 w-7 object-contain cursor-pointer ml-auto opacity-80 hover:opacity-100',
-        title: 'Ordinalswallet Marketplace'
-      })
-    ),
-    React.createElement('div', { className: 'flex items-center justify-center gap-2 px-4 py-2 bg-bitmap-black border-b border-bitmap-border' },
-      statsUnchanged
-        ? React.createElement('span', { className: 'font-acme text-xs text-bitmap-muted' }, 'Stats sin cambios')
-        : React.createElement('span', { className: 'font-acme text-xs' },
-            React.createElement('span', { className: 'text-bitmap-text cursor-pointer', onClick: handleRefresh }, 'actualizado'),
-            React.createElement('span', { className: 'text-bitmap-text mx-1' }, ' '),
-            React.createElement('span', { className: 'text-bitmap-orange font-bold' }, ' ' + timeStr + ' '),
-            React.createElement('span', { className: 'text-bitmap-text' }, ' en '),
-            React.createElement('span', { className: 'text-bitmap-orange' }, 'cargados: '),
-            React.createElement('span', { className: 'text-bitmap-orange font-bold' }, cacheCount + ' / ' + BitmapUtils.formatNumber(totalListings))
-          )
     ),
     React.createElement('div', { className: 'px-4 py-2 border-b border-bitmap-border' },
       React.createElement('input', {
