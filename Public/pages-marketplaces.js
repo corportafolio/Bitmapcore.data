@@ -99,6 +99,7 @@ function OrdinalswalletPage(props) {
           onClick: function() { navigate('/marketplace'); },
           className: 'text-bitmap-orange hover:text-white font-acme text-sm'
         }, '\u2190'),
+        React.createElement('img', { src: 'ordinalswallet_logo.png', alt: '', className: 'h-5 w-5 object-contain' }),
         React.createElement('span', { className: 'font-alfaslab text-sm text-white tracking-wide' }, 'Ordinalswallet Marketplace')
       ),
       React.createElement('div', { className: 'flex justify-between items-center mt-1' },
