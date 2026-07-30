@@ -1,8 +1,5 @@
 function PantallaDeTablas(props) {
   var navigate = props.navigate;
-  var _a = React.useState(false);
-  var sidebarOpen = _a[0];
-  var setSidebarOpen = _a[1];
   var _b = React.useState([]);
   var tags = _b[0];
   var setTags = _b[1];
@@ -31,41 +28,32 @@ function PantallaDeTablas(props) {
     return t.name.toLowerCase().indexOf(searchQuery.toLowerCase()) !== -1;
   });
 
-  return React.createElement('div', { className:'flex flex-col h-full' },
-    React.createElement(HeaderBar, {
-      onMenuToggle: function() { setSidebarOpen(!sidebarOpen); },
-      navigate: navigate
-    }),
-    React.createElement('div', { className:'flex flex-1 overflow-hidden' },
-      React.createElement(Sidebar, { isOpen:sidebarOpen, onClose:function() { setSidebarOpen(false); }, navigate:navigate, currentPath:'/tag-tables' }),
-      React.createElement('main', { className:'flex-1 overflow-y-auto p-4 lg:p-6' },
-        React.createElement('div', { className:'max-w-5xl mx-auto space-y-6' },
-          React.createElement('div', { className:'flex items-center justify-between' },
-            React.createElement('h1', { className:'font-alfaslab text-2xl text-white' }, 'Tablas de Etiquetas'),
-            React.createElement('span', { className:'font-acme text-sm text-bitmap-muted' }, filteredTags.length + ' / 55 tablas')
-          ),
-          React.createElement('div', { className:'bg-bitmap-surface border border-bitmap-border rounded-xl p-4' },
-            React.createElement('input', {
-              type:'text',
-              value:searchQuery,
-              onChange:function(e) { setSearchQuery(e.target.value); },
-              placeholder:'Buscar tabla...',
-              className:'w-full bg-bitmap-black border border-bitmap-border rounded-lg px-3 py-2 font-acme text-sm text-bitmap-text placeholder-bitmap-muted focus:outline-none focus:border-bitmap-orange transition-colors h-10'
-            })
-          ),
-          isLoading ? React.createElement('div', { className:'flex items-center justify-center h-64 font-acme text-bitmap-muted' }, I18n.t('app.loading')) : React.createElement('div', { className:'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3' },
-            filteredTags.map(function(tag, i) {
-              return React.createElement(TagPreviewCard, {
-                key: tag.name + '-' + i,
-                tag: tag,
-                onClick: function() { navigate('/tag-tables/' + encodeURIComponent(tag.name)); }
-              });
-            })
-          ),
-          !isLoading && filteredTags.length === 0 ? React.createElement('div', { className:'text-center py-8 font-acme text-bitmap-muted' }, 'No se encontraron tablas') : null
-        )
+  return React.createElement('div', { className:'p-4 lg:p-6' },
+      React.createElement('div', { className:'max-w-5xl mx-auto space-y-6' },
+        React.createElement('div', { className:'flex items-center justify-between' },
+          React.createElement('h1', { className:'font-alfaslab text-2xl text-white' }, 'Tablas de Etiquetas'),
+          React.createElement('span', { className:'font-acme text-sm text-bitmap-muted' }, filteredTags.length + ' / 55 tablas')
+        ),
+        React.createElement('div', { className:'bg-bitmap-surface border border-bitmap-border rounded-xl p-4' },
+          React.createElement('input', {
+            type:'text',
+            value:searchQuery,
+            onChange:function(e) { setSearchQuery(e.target.value); },
+            placeholder:'Buscar tabla...',
+            className:'w-full bg-bitmap-black border border-bitmap-border rounded-lg px-3 py-2 font-acme text-sm text-bitmap-text placeholder-bitmap-muted focus:outline-none focus:border-bitmap-orange transition-colors h-10'
+          })
+        ),
+        isLoading ? React.createElement('div', { className:'flex items-center justify-center h-64 font-acme text-bitmap-muted' }, I18n.t('app.loading')) : React.createElement('div', { className:'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3' },
+          filteredTags.map(function(tag, i) {
+            return React.createElement(TagPreviewCard, {
+              key: tag.name + '-' + i,
+              tag: tag,
+              onClick: function() { navigate('/tag-tables/' + encodeURIComponent(tag.name)); }
+            });
+          })
+        ),
+        !isLoading && filteredTags.length === 0 ? React.createElement('div', { className:'text-center py-8 font-acme text-bitmap-muted' }, 'No se encontraron tablas') : null
       )
-    )
   );
 }
 
@@ -111,9 +99,6 @@ function TagPreviewCard(props) {
 function TagTableScreen(props) {
   var navigate = props.navigate;
   var tagName = props.tagName;
-  var _a = React.useState(false);
-  var sidebarOpen = _a[0];
-  var setSidebarOpen = _a[1];
   var _b = React.useState([]);
   var blocks = _b[0];
   var setBlocks = _b[1];
@@ -191,13 +176,7 @@ function TagTableScreen(props) {
 
   var decodedName = decodeURIComponent(tagName);
 
-  return React.createElement('div', { className:'flex flex-col h-full' },
-    React.createElement(HeaderBar, {
-      showBackButton: true,
-      title: decodedName,
-      navigate: navigate
-    }),
-    React.createElement('main', { className:'flex-1 overflow-y-auto p-4 lg:p-6' },
+  return React.createElement('div', { className:'p-4 lg:p-6' },
       React.createElement('div', { className:'max-w-4xl mx-auto space-y-4' },
         React.createElement('div', { className:'bg-bitmap-surface border border-bitmap-border rounded-xl p-4' },
           React.createElement('div', { className:'flex items-center justify-between' },
@@ -244,6 +223,5 @@ function TagTableScreen(props) {
           }, isLoadingMore ? 'Cargando...' : 'Cargar mas (' + blocks.length + ' / ' + totalCount + ')')
         ) : null
       )
-    )
   );
 }

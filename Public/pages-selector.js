@@ -21,20 +21,11 @@ function SelectorScreenPage(props) {
     return function() { clearTimeout(timer); };
   }, []);
 
-  return React.createElement('div', { className:'flex flex-col h-full' },
-    React.createElement('header', { className:'flex items-center h-14 bg-bitmap-orange px-4 z-30' },
-      React.createElement('button', {
-        onClick: function() { navigate('/'); },
-        className:'font-alfaslab text-black text-sm hover:text-black/70 transition-colors mr-3'
-      }, '\u2190 Volver'),
-      React.createElement('span', { className:'font-alfaslab text-black text-lg' }, 'Marketplaces'),
-      React.createElement('div', { className:'flex-1' }),
-      React.createElement('img', { src:'logo_bitmapcore.png', alt:'BitmapCore', className:'h-8 w-8 object-contain' })
-    ),
+  return React.createElement('div', { className:'p-3' },
     isLoading ? React.createElement('div', { className:'flex-1 flex items-center justify-center' },
       React.createElement('p', { className:'font-acme text-bitmap-muted' }, I18n.t ? I18n.t('app.loading') : 'Cargando...')
     ) :
-    React.createElement('main', { className:'flex-1 overflow-y-auto p-3 space-y-2' },
+    React.createElement('div', { className:'space-y-2' },
       marketplaces.map(function(mp) {
         var data = SelectorScreenViewModel.getMarketplaceData(mp.id);
         return React.createElement(SelectorBubble, {

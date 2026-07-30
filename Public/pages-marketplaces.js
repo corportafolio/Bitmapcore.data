@@ -108,11 +108,6 @@ function OrdinalswalletPage(props) {
   return React.createElement('div', { className: 'flex flex-col h-full' },
     React.createElement('div', { className: 'bg-bitmap-surface border-b border-bitmap-border px-4 py-2' },
       React.createElement('div', { className: 'flex items-center gap-2 flex-wrap' },
-        React.createElement('button', {
-          onClick: function() { navigate('/marketplace'); },
-          className: 'text-bitmap-orange hover:text-white font-acme text-sm'
-        }, '\u2190'),
-        React.createElement('img', { src: 'ordinalswallet_logo.png', alt: '', className: 'h-5 w-5 object-contain' }),
         React.createElement('span', { className: 'font-alfaslab text-sm text-white tracking-wide' }, 'Ordinalswallet Marketplace'),
         React.createElement('span', { className: 'font-acme text-xs text-bitmap-muted ml-2 hidden sm:inline' },
           'actualizado: ',
@@ -229,30 +224,27 @@ function UnisatPage(props) {
       return (a.blockNumber || 0) - (b.blockNumber || 0);
     });
 
-  return React.createElement('div', { className:'flex flex-col h-full' },
-    React.createElement(HeaderBar, { showBackButton:true, title:'Unisat', navigate:navigate }),
-    React.createElement('main', { className:'flex-1 overflow-y-auto p-4 lg:p-6' },
-      React.createElement('div', { className:'max-w-4xl mx-auto space-y-4' },
-        React.createElement('div', { className:'flex flex-col sm:flex-row gap-3' },
-          React.createElement('input', {
-            type:'text', value:searchQuery,
-            onChange:function(e) { setSearchQuery(e.target.value); },
-            placeholder:'Buscar por número de bloque...',
-            className:'flex-1 bg-bitmap-surface border border-bitmap-border rounded-lg px-4 py-2.5 font-acme text-sm text-bitmap-text placeholder-bitmap-muted focus:outline-none focus:border-bitmap-orange'
-          }),
-          React.createElement('select', {
-            value:sortBy,
-            onChange:function(e) { setSortBy(e.target.value); },
-            className:'bg-bitmap-surface border border-bitmap-border rounded-lg px-3 py-2.5 font-acme text-sm text-bitmap-text focus:outline-none'
-          },
-            React.createElement('option', { value:'price' }, 'Precio'),
-            React.createElement('option', { value:'block' }, 'Bloque')
-          )
-        ),
-        isLoading ? React.createElement('div', { className:'text-center py-12 font-acme text-bitmap-muted' }, I18n.t('app.loading')) :
-        filtered.length === 0 ? React.createElement('div', { className:'text-center py-12 font-acme text-bitmap-muted' }, I18n.t('marketplace.noListings')) :
-        React.createElement(MarketPreview, { listings:filtered, marketplace:'unisat' })
-      )
+  return React.createElement('div', { className:'p-4 lg:p-6' },
+    React.createElement('div', { className:'max-w-4xl mx-auto space-y-4' },
+      React.createElement('div', { className:'flex flex-col sm:flex-row gap-3' },
+        React.createElement('input', {
+          type:'text', value:searchQuery,
+          onChange:function(e) { setSearchQuery(e.target.value); },
+          placeholder:'Buscar por número de bloque...',
+          className:'flex-1 bg-bitmap-surface border border-bitmap-border rounded-lg px-4 py-2.5 font-acme text-sm text-bitmap-text placeholder-bitmap-muted focus:outline-none focus:border-bitmap-orange'
+        }),
+        React.createElement('select', {
+          value:sortBy,
+          onChange:function(e) { setSortBy(e.target.value); },
+          className:'bg-bitmap-surface border border-bitmap-border rounded-lg px-3 py-2.5 font-acme text-sm text-bitmap-text focus:outline-none'
+        },
+          React.createElement('option', { value:'price' }, 'Precio'),
+          React.createElement('option', { value:'block' }, 'Bloque')
+        )
+      ),
+      isLoading ? React.createElement('div', { className:'text-center py-12 font-acme text-bitmap-muted' }, I18n.t('app.loading')) :
+      filtered.length === 0 ? React.createElement('div', { className:'text-center py-12 font-acme text-bitmap-muted' }, I18n.t('marketplace.noListings')) :
+      React.createElement(MarketPreview, { listings:filtered, marketplace:'unisat' })
     )
   );
 }

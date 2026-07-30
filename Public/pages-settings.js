@@ -40,10 +40,8 @@ function SettingsPage(props) {
     setTimeout(function() { setSaved(false); }, 2000);
   };
 
-  return React.createElement('div', { className:'flex flex-col h-full' },
-    React.createElement(HeaderBar, { showBackButton:true, title:'Ajustes', navigate:navigate }),
-    React.createElement('main', { className:'flex-1 overflow-y-auto p-4 lg:p-6' },
-      React.createElement('div', { className:'max-w-xl mx-auto space-y-6' },
+  return React.createElement('div', { className:'p-4 lg:p-6' },
+    React.createElement('div', { className:'max-w-xl mx-auto space-y-6' },
         React.createElement('div', { className:'bg-bitmap-surface border border-bitmap-border rounded-xl p-6' },
           React.createElement('h2', { className:'font-alfaslab text-lg text-white mb-4 flex items-center gap-2' },
             React.createElement('span', { className:'text-xl' }, '\uD83D\uDC64'),
@@ -145,6 +143,5 @@ function SettingsPage(props) {
           className:'w-full py-3 bg-bitmap-orange text-white font-alfaslab text-base rounded-lg hover:bg-bitmap-orange/80 transition-colors disabled:opacity-50'
         }, isSaving ? 'Guardando...' : 'Guardar Cambios')
       )
-    )
   );
 }

@@ -1,8 +1,5 @@
 function HomePage(props) {
   var navigate = props.navigate;
-  var _a = React.useState(false);
-  var sidebarOpen = _a[0];
-  var setSidebarOpen = _a[1];
   var _b = React.useState('');
   var searchQuery = _b[0];
   var setSearchQuery = _b[1];
@@ -59,7 +56,6 @@ function HomePage(props) {
   };
 
   var handleResultClick = function(result) {
-    setSidebarOpen(false);
     if (result.type === 'block') navigate('/blocks/' + result.id);
     else navigate('/tags/' + result.id);
   };
@@ -92,70 +88,64 @@ function HomePage(props) {
     return arr;
   };
 
-  return React.createElement('div', { className:'flex flex-col h-full' },
-    React.createElement(HeaderBar, { onMenuToggle:function() { setSidebarOpen(!sidebarOpen); }, navigate:navigate }),
-    React.createElement('div', { className:'flex flex-1 overflow-hidden' },
-      React.createElement(Sidebar, { isOpen:sidebarOpen, onClose:function() { setSidebarOpen(false); }, navigate:navigate, currentPath:'/' }),
-      React.createElement('main', { className:'flex-1 overflow-y-auto p-4 lg:p-6' },
-        React.createElement('div', { className:'max-w-4xl mx-auto space-y-4' },
-          React.createElement('div', { className:'bg-bitmap-surface border border-bitmap-border rounded-xl p-4' },
-            React.createElement('div', { className:'flex items-center gap-2' },
-              React.createElement('span', { className:'text-lg' }, '\uD83D\uDD0D'),
-              React.createElement('input', {
-                type:'text',
-                value:searchQuery,
-                onChange:function(e) { handleSearch(e.target.value); },
-                placeholder:'Buscar bloque o etiqueta...',
-                className:'flex-1 bg-bitmap-black border border-bitmap-border rounded-lg px-3 py-2 font-acme text-sm text-bitmap-text placeholder-bitmap-muted focus:outline-none focus:border-bitmap-orange transition-colors h-10'
-              })
-            ),
-            isSearching ? React.createElement('div', { className:'mt-2 font-acme text-xs text-bitmap-muted' }, I18n.t('app.loading')) : null
-          ),
-          searchResults.length > 0 ? React.createElement('div', { className:'grid grid-cols-2 md:grid-cols-4 gap-3' },
-            searchResults.map(function(result, i) {
-              return React.createElement(ResultCard, {
-                key: result.type + '-' + result.id + '-' + i,
-                type: result.type,
-                id: result.id,
-                label: result.label,
-                price: result.price,
-                onClick: function() { handleResultClick(result); }
-              });
+  return React.createElement('div', { className:'p-4 lg:p-6' },
+    React.createElement('div', { className:'max-w-4xl mx-auto space-y-4' },
+      React.createElement('div', { className:'bg-bitmap-surface border border-bitmap-border rounded-xl p-4' },
+        React.createElement('div', { className:'flex items-center gap-2' },
+          React.createElement('span', { className:'text-lg' }, '\uD83D\uDD0D'),
+          React.createElement('input', {
+            type:'text',
+            value:searchQuery,
+            onChange:function(e) { handleSearch(e.target.value); },
+            placeholder:'Buscar bloque o etiqueta...',
+            className:'flex-1 bg-bitmap-black border border-bitmap-border rounded-lg px-3 py-2 font-acme text-sm text-bitmap-text placeholder-bitmap-muted focus:outline-none focus:border-bitmap-orange transition-colors h-10'
+          })
+        ),
+        isSearching ? React.createElement('div', { className:'mt-2 font-acme text-xs text-bitmap-muted' }, I18n.t('app.loading')) : null
+      ),
+      searchResults.length > 0 ? React.createElement('div', { className:'grid grid-cols-2 md:grid-cols-4 gap-3' },
+        searchResults.map(function(result, i) {
+          return React.createElement(ResultCard, {
+            key: result.type + '-' + result.id + '-' + i,
+            type: result.type,
+            id: result.id,
+            label: result.label,
+            price: result.price,
+            onClick: function() { handleResultClick(result); }
+          });
+        })
+      ) : null,
+      searchQuery && searchResults.length === 0 && !isSearching ? React.createElement('div', { className:'text-center py-8 font-acme text-bitmap-muted' }, I18n.t('app.noResults')) : null,
+      tagsLoading ? React.createElement('div', { className:'flex items-center justify-center h-32 font-acme text-bitmap-muted' }, I18n.t('app.loading')) :
+      React.createElement('div', { className:'space-y-2' },
+        React.createElement('div', { className:'flex items-center justify-between' },
+        React.createElement('h2', { className:'font-alfaslab text-lg text-white' }, filteredTags.length + ' Tablas de Etiquetas (' + tags.length + ')'),
+        React.createElement('div', { className:'relative' },
+          React.createElement('button', {
+            onClick:function() { setSortMenuOpen(!sortMenuOpen); },
+            className:'bg-bitmap-orange text-black font-alfaslab text-xs px-3 py-1 rounded-lg whitespace-nowrap'
+          }, 'Ordenar'),
+          sortMenuOpen ? React.createElement('div', { className:'absolute right-0 top-full mt-1 bg-bitmap-surface border border-bitmap-border rounded-lg py-1 z-50 min-w-[180px]' },
+            sortOptions.map(function(opt) {
+              var isActive = sortOrder === opt.key;
+              return React.createElement('button', {
+                key: opt.key,
+                onClick:function() { setSortOrder(opt.key); setSortMenuOpen(false); },
+                className:'block w-full text-left px-4 py-2 font-acme text-xs transition-colors ' +
+                  (isActive ? 'text-bitmap-orange font-bold bg-bitmap-black' : 'text-bitmap-orange-light hover:bg-bitmap-black')
+              }, (isActive ? '\u2713 ' : '') + opt.label);
             })
-          ) : null,
-          searchQuery && searchResults.length === 0 && !isSearching ? React.createElement('div', { className:'text-center py-8 font-acme text-bitmap-muted' }, I18n.t('app.noResults')) : null,
-          tagsLoading ? React.createElement('div', { className:'flex items-center justify-center h-32 font-acme text-bitmap-muted' }, I18n.t('app.loading')) :
-          React.createElement('div', { className:'space-y-2' },
-            React.createElement('div', { className:'flex items-center justify-between' },
-            React.createElement('h2', { className:'font-alfaslab text-lg text-white' }, filteredTags.length + ' Tablas de Etiquetas (' + tags.length + ')'),
-            React.createElement('div', { className:'relative' },
-              React.createElement('button', {
-                onClick:function() { setSortMenuOpen(!sortMenuOpen); },
-                className:'bg-bitmap-orange text-black font-alfaslab text-xs px-3 py-1 rounded-lg whitespace-nowrap'
-              }, 'Ordenar'),
-              sortMenuOpen ? React.createElement('div', { className:'absolute right-0 top-full mt-1 bg-bitmap-surface border border-bitmap-border rounded-lg py-1 z-50 min-w-[180px]' },
-                sortOptions.map(function(opt) {
-                  var isActive = sortOrder === opt.key;
-                  return React.createElement('button', {
-                    key: opt.key,
-                    onClick:function() { setSortOrder(opt.key); setSortMenuOpen(false); },
-                    className:'block w-full text-left px-4 py-2 font-acme text-xs transition-colors ' +
-                      (isActive ? 'text-bitmap-orange font-bold bg-bitmap-black' : 'text-bitmap-orange-light hover:bg-bitmap-black')
-                  }, (isActive ? '\u2713 ' : '') + opt.label);
-                })
-              ) : null
-            )
-          ),
-            React.createElement('div', { className:'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3' },
-              getSortedTags().map(function(tag, i) {
-                return React.createElement(TagPreviewCard, {
-                  key: tag.name + '-' + i,
-                  tag: tag,
-                  onClick: function() { navigate('/tag-tables/' + encodeURIComponent(tag.name)); }
-                });
-              })
-            )
-          )
+          ) : null
+        )
+      ),
+        React.createElement('div', { className:'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3' },
+          getSortedTags().map(function(tag, i) {
+            return React.createElement(TagPreviewCard, {
+              key: tag.name + '-' + i,
+              tag: tag,
+              onClick: function() { navigate('/tag-tables/' + encodeURIComponent(tag.name)); }
+            });
+          })
         )
       )
     )
@@ -206,25 +196,22 @@ function MarketplaceSelectorPage(props) {
     }
   };
 
-  return React.createElement('div', { className:'flex flex-col h-full' },
-    React.createElement(HeaderBar, { title:I18n.t('marketplace.title'), navigate:navigate }),
-    React.createElement('main', { className:'flex-1 overflow-y-auto p-4 lg:p-6' },
-      React.createElement('div', { className:'max-w-3xl mx-auto space-y-3' },
-        React.createElement('h2', { className:'font-alfaslab text-xl text-white mb-4' }, I18n.t('marketplace.selectMarketplace')),
-        marketplaces.map(function(mp) {
-          var data = getData(mp.id);
-          return React.createElement(MarketplaceBubble, {
-            key: mp.id,
-            name: mp.label,
-            icon: mp.icon,
-            listings: data.listings,
-            floorPrice: data.floor,
-            sold: data.sold,
-            isDiscount: mp.isDiscount,
-            onSelect: function() { navigate(mp.path); }
-          });
-        })
-      )
+  return React.createElement('div', { className:'p-4 lg:p-6' },
+    React.createElement('div', { className:'max-w-3xl mx-auto space-y-3' },
+      React.createElement('h2', { className:'font-alfaslab text-xl text-white mb-4' }, I18n.t('marketplace.selectMarketplace')),
+      marketplaces.map(function(mp) {
+        var data = getData(mp.id);
+        return React.createElement(MarketplaceBubble, {
+          key: mp.id,
+          name: mp.label,
+          icon: mp.icon,
+          listings: data.listings,
+          floorPrice: data.floor,
+          sold: data.sold,
+          isDiscount: mp.isDiscount,
+          onSelect: function() { navigate(mp.path); }
+        });
+      })
     )
   );
 }

@@ -16,10 +16,8 @@ function WalletConnectPage(props) {
     return unsub;
   }, []);
 
-  return React.createElement('div', { className:'flex flex-col h-full' },
-    React.createElement(HeaderBar, { showBackButton:true, title:I18n.t('wallet.title'), navigate:navigate }),
-    React.createElement('main', { className:'flex-1 overflow-y-auto p-4 lg:p-6' },
-      React.createElement('div', { className:'max-w-md mx-auto space-y-6' },
+  return React.createElement('div', { className:'p-4 lg:p-6' },
+    React.createElement('div', { className:'max-w-md mx-auto space-y-6' },
         React.createElement('h2', { className:'font-alfaslab text-xl text-white text-center' }, I18n.t('wallet.connect')),
         !wallet.isConnected ? React.createElement('div', { className:'space-y-4' },
           React.createElement('p', { className:'font-acme text-sm text-bitmap-text text-center' }, I18n.t('wallet.connectPrompt')),
@@ -52,7 +50,6 @@ function WalletConnectPage(props) {
           }, I18n.t('wallet.disconnect'))
         )
       )
-    )
   );
 }
 
@@ -61,24 +58,19 @@ function WalletDashboardPage(props) {
   var wallet = StoreApp.get('wallet');
 
   if (!wallet.isConnected) {
-    return React.createElement('div', { className:'flex flex-col h-full' },
-      React.createElement(HeaderBar, { showBackButton:true, title:I18n.t('wallet.dashboard'), navigate:navigate }),
-      React.createElement('main', { className:'flex-1 flex items-center justify-center' },
-        React.createElement('div', { className:'text-center' },
-          React.createElement('p', { className:'font-acme text-bitmap-muted mb-4' }, I18n.t('wallet.notConnected')),
-          React.createElement('button', {
-            onClick:function() { navigate('/wallet'); },
-            className:'px-4 py-2 bg-bitmap-orange text-white rounded-lg font-alfaslab text-sm'
-          }, I18n.t('wallet.connect'))
-        )
+    return React.createElement('div', { className:'flex items-center justify-center h-full' },
+      React.createElement('div', { className:'text-center' },
+        React.createElement('p', { className:'font-acme text-bitmap-muted mb-4' }, I18n.t('wallet.notConnected')),
+        React.createElement('button', {
+          onClick:function() { navigate('/wallet'); },
+          className:'px-4 py-2 bg-bitmap-orange text-white rounded-lg font-alfaslab text-sm'
+        }, I18n.t('wallet.connect'))
       )
     );
   }
 
-  return React.createElement('div', { className:'flex flex-col h-full' },
-    React.createElement(HeaderBar, { showBackButton:true, title:I18n.t('wallet.dashboard'), navigate:navigate }),
-    React.createElement('main', { className:'flex-1 overflow-y-auto p-4 lg:p-6' },
-      React.createElement('div', { className:'max-w-md mx-auto space-y-4' },
+  return React.createElement('div', { className:'p-4 lg:p-6' },
+    React.createElement('div', { className:'max-w-md mx-auto space-y-4' },
         React.createElement('h2', { className:'font-alfaslab text-xl text-white' }, 'Wallet Dashboard'),
         React.createElement('div', { className:'bg-bitmap-surface border border-bitmap-border rounded-xl p-4' },
           React.createElement('div', { className:'text-center' },
@@ -95,7 +87,6 @@ function WalletDashboardPage(props) {
           className:'w-full py-3 bg-bitmap-surface border border-bitmap-border text-white font-alfaslab text-sm rounded-lg hover:border-bitmap-orange transition-colors'
         }, I18n.t('wallet.myAssets'))
       )
-    )
   );
 }
 
@@ -119,10 +110,8 @@ function MisActivosPage(props) {
     }).catch(function() { setIsLoading(false); });
   }, [wallet.address]);
 
-  return React.createElement('div', { className:'flex flex-col h-full' },
-    React.createElement(HeaderBar, { showBackButton:true, title:I18n.t('wallet.myAssets'), navigate:navigate }),
-    React.createElement('main', { className:'flex-1 overflow-y-auto p-4 lg:p-6' },
-      React.createElement('div', { className:'max-w-4xl mx-auto space-y-4' },
+  return React.createElement('div', { className:'p-4 lg:p-6' },
+    React.createElement('div', { className:'max-w-4xl mx-auto space-y-4' },
         React.createElement('h2', { className:'font-alfaslab text-xl text-white' }, I18n.t('wallet.myAssets')),
         !wallet.isConnected ? React.createElement('div', { className:'text-center py-12 font-acme text-bitmap-muted' }, I18n.t('wallet.connectPrompt')) :
         isLoading ? React.createElement('div', { className:'text-center py-12 font-acme text-bitmap-muted' }, I18n.t('app.loading')) :
@@ -139,7 +128,6 @@ function MisActivosPage(props) {
           })
         )
       )
-    )
   );
 }
 
@@ -147,10 +135,8 @@ function TransactionPage(props) {
   var navigate = props.navigate;
   var txId = props.txId;
 
-  return React.createElement('div', { className:'flex flex-col h-full' },
-    React.createElement(HeaderBar, { showBackButton:true, title:'Transacción', navigate:navigate }),
-    React.createElement('main', { className:'flex-1 overflow-y-auto p-4 lg:p-6' },
-      React.createElement('div', { className:'max-w-md mx-auto space-y-4' },
+  return React.createElement('div', { className:'p-4 lg:p-6' },
+    React.createElement('div', { className:'max-w-md mx-auto space-y-4' },
         React.createElement('h2', { className:'font-alfaslab text-xl text-white' }, 'Transacción #' + txId),
         React.createElement('div', { className:'bg-bitmap-surface border border-bitmap-border rounded-xl p-4 space-y-3' },
           React.createElement('div', { className:'flex justify-between' },
@@ -163,7 +149,6 @@ function TransactionPage(props) {
           )
         )
       )
-    )
   );
 }
 
@@ -176,10 +161,8 @@ function PSBTPage(props) {
   var toast = _b[0];
   var setToast = _b[1];
 
-  return React.createElement('div', { className:'flex flex-col h-full' },
-    React.createElement(HeaderBar, { showBackButton:true, title:I18n.t('psbt.title'), navigate:navigate }),
-    React.createElement('main', { className:'flex-1 overflow-y-auto p-4 lg:p-6' },
-      React.createElement('div', { className:'max-w-md mx-auto space-y-4' },
+  return React.createElement('div', { className:'p-4 lg:p-6' },
+    React.createElement('div', { className:'max-w-md mx-auto space-y-4' },
         React.createElement('h2', { className:'font-alfaslab text-xl text-white' }, I18n.t('psbt.title')),
         React.createElement('textarea', {
           value:psbt,
@@ -192,7 +175,6 @@ function PSBTPage(props) {
           disabled:!psbt,
           className:'w-full py-3 bg-bitmap-orange text-white font-alfaslab text-sm rounded-lg hover:bg-bitmap-orange/80 transition-colors disabled:opacity-50'
         }, I18n.t('psbt.sign'))
-      )
     ),
     toast ? React.createElement(Toast, { message:toast, type:'info', onDone:function() { setToast(''); } }) : null
   );

@@ -7,6 +7,33 @@
   var useParams = Router.useParams;
   var useLocation = Router.useLocation;
 
+  function Layout(props) {
+    var navigate = props.navigate;
+    var currentPath = props.currentPath;
+    var children = props.children;
+    var _sidebar = React.useState(false);
+    var sidebarOpen = _sidebar[0];
+    var setSidebarOpen = _sidebar[1];
+
+    return React.createElement('div', { className:'flex flex-col h-full' },
+      React.createElement(HeaderBar, {
+        onMenuToggle: function() { setSidebarOpen(!sidebarOpen); },
+        navigate: navigate
+      }),
+      React.createElement('div', { className:'flex flex-1 overflow-hidden' },
+        React.createElement(Sidebar, {
+          isOpen: sidebarOpen,
+          onClose: function() { setSidebarOpen(false); },
+          navigate: navigate,
+          currentPath: currentPath
+        }),
+        React.createElement('main', { className:'flex-1 overflow-y-auto' },
+          children
+        )
+      )
+    );
+  }
+
   function AppRoutes() {
     var navigate = useNavigate();
     var location = useLocation();
@@ -20,7 +47,9 @@
     var wrapper = function(PageComponent, extraProps) {
       return React.createElement(React.Fragment, null,
         React.createElement(FloatingMarketplaceMenu, { navigate:navigate }),
-        React.createElement(PageComponent, Object.assign({ navigate:navigate, currentPath:currentPath }, extraProps, p))
+        React.createElement(Layout, { navigate:navigate, currentPath:currentPath },
+          React.createElement(PageComponent, Object.assign({ navigate:navigate, currentPath:currentPath }, extraProps, p))
+        )
       );
     };
 
